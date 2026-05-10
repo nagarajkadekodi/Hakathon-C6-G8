@@ -1,0 +1,1230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DevOps Incident Analyzer</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0d1117;
+      --surface: #161b22;
+      --surface2: #21262d;
+      --border: #30363d;
+      --text: #e6edf3;
+      --text-muted: #8b949e;
+      --accent: #58a6ff;
+      --accent-dim: #1f3a5f;
+      --p0: #ff4444;
+      --p1: #f97316;
+      --p2: #eab308;
+      --p3: #22c55e;
+      --p0-bg: #2d0d0d;
+      --p1-bg: #2d1a00;
+      --p2-bg: #2d2500;
+      --p3-bg: #0d2d1a;
+      --slack-bg: #1a1d21;
+      --slack-sidebar: #350d36;
+      --jira-blue: #0052cc;
+      --radius: 8px;
+      --shadow: 0 4px 24px rgba(0,0,0,0.4);
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-size: 14px;
+      line-height: 1.6;
+      min-height: 100vh;
+    }
+
+    /* ── HEADER ── */
+    header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 0 24px;
+      height: 56px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .header-logo { font-size: 18px; font-weight: 700; color: var(--text); display: flex; align-items: center; gap: 8px; }
+    .header-logo span { font-size: 20px; }
+    .model-badge {
+      margin-left: auto;
+      background: var(--accent-dim);
+      color: var(--accent);
+      border: 1px solid var(--accent);
+      border-radius: 20px;
+      padding: 2px 12px;
+      font-size: 12px;
+      font-family: monospace;
+    }
+
+    /* ── LAYOUT ── */
+    main { max-width: 900px; margin: 0 auto; padding: 32px 24px 80px; }
+
+    /* ── UPLOAD SECTION ── */
+    #upload-section { display: flex; flex-direction: column; gap: 16px; }
+
+    .upload-title { font-size: 22px; font-weight: 700; }
+    .upload-subtitle { color: var(--text-muted); margin-top: 4px; }
+
+    #drop-zone {
+      border: 2px dashed var(--border);
+      border-radius: var(--radius);
+      padding: 48px 24px;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color 0.2s, background 0.2s;
+      background: var(--surface);
+    }
+    #drop-zone:hover, #drop-zone.drag-over {
+      border-color: var(--accent);
+      background: var(--accent-dim);
+    }
+    #drop-zone .dz-icon { font-size: 40px; margin-bottom: 12px; }
+    #drop-zone .dz-label { font-size: 15px; font-weight: 600; }
+    #drop-zone .dz-sub { color: var(--text-muted); font-size: 13px; margin-top: 6px; }
+    #drop-zone .dz-file-selected { color: var(--accent); font-weight: 600; margin-top: 8px; font-size: 13px; }
+
+    .divider-or {
+      display: flex; align-items: center; gap: 12px; color: var(--text-muted); font-size: 12px;
+    }
+    .divider-or::before, .divider-or::after {
+      content: ''; flex: 1; height: 1px; background: var(--border);
+    }
+
+    textarea#paste-area {
+      width: 100%;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      color: var(--text);
+      font-family: 'Consolas', 'Monaco', monospace;
+      font-size: 12px;
+      padding: 12px;
+      resize: vertical;
+      min-height: 120px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    textarea#paste-area:focus { border-color: var(--accent); }
+    textarea#paste-area::placeholder { color: var(--text-muted); }
+
+    .btn-row { display: flex; gap: 12px; align-items: center; }
+
+    .btn-primary {
+      background: var(--accent);
+      color: #000;
+      border: none;
+      border-radius: var(--radius);
+      padding: 10px 24px;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: opacity 0.2s;
+    }
+    .btn-primary:hover { opacity: 0.85; }
+    .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    .btn-secondary {
+      background: var(--surface2);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 10px 20px;
+      font-size: 13px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .btn-secondary:hover { background: var(--border); }
+
+    .sample-hint { color: var(--text-muted); font-size: 12px; }
+    .sample-hint a { color: var(--accent); cursor: pointer; text-decoration: none; }
+    .sample-hint a:hover { text-decoration: underline; }
+
+    /* ── PROGRESS SECTION ── */
+    #progress-section { display: none; }
+    .progress-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 32px;
+      text-align: center;
+    }
+    .progress-title { font-size: 16px; font-weight: 600; margin-bottom: 28px; }
+    .steps-row {
+      display: flex;
+      justify-content: center;
+      gap: 0;
+      position: relative;
+    }
+    .steps-row::before {
+      content: '';
+      position: absolute;
+      top: 20px;
+      left: calc(10% + 20px);
+      right: calc(10% + 20px);
+      height: 2px;
+      background: var(--border);
+      z-index: 0;
+    }
+    .step-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      flex: 1;
+      position: relative;
+      z-index: 1;
+    }
+    .step-dot {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      border: 2px solid var(--border);
+      background: var(--surface);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+      transition: all 0.4s;
+    }
+    .step-label { font-size: 11px; color: var(--text-muted); text-align: center; max-width: 90px; transition: color 0.4s; }
+
+    .step-item.active .step-dot {
+      border-color: var(--accent);
+      background: var(--accent-dim);
+      box-shadow: 0 0 0 4px rgba(88,166,255,0.15);
+      animation: pulse 1.5s infinite;
+    }
+    .step-item.active .step-label { color: var(--accent); font-weight: 600; }
+    .step-item.done .step-dot { border-color: var(--p3); background: var(--p3-bg); }
+    .step-item.done .step-label { color: var(--p3); }
+
+    @keyframes pulse {
+      0%, 100% { box-shadow: 0 0 0 4px rgba(88,166,255,0.15); }
+      50% { box-shadow: 0 0 0 8px rgba(88,166,255,0.08); }
+    }
+
+    /* ── RESULTS SECTION ── */
+    #results-section { display: none; }
+
+    .results-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 24px;
+      flex-wrap: wrap;
+    }
+    .results-title { font-size: 18px; font-weight: 700; }
+    .incident-id { font-family: monospace; font-size: 13px; color: var(--text-muted); }
+    .timing { color: var(--text-muted); font-size: 12px; margin-left: auto; }
+    .results-actions { display: flex; gap: 8px; }
+
+    .severity-badge {
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-weight: 700;
+      font-size: 13px;
+    }
+    .badge-P0 { background: var(--p0-bg); color: var(--p0); border: 1px solid var(--p0); }
+    .badge-P1 { background: var(--p1-bg); color: var(--p1); border: 1px solid var(--p1); }
+    .badge-P2 { background: var(--p2-bg); color: var(--p2); border: 1px solid var(--p2); }
+    .badge-P3 { background: var(--p3-bg); color: var(--p3); border: 1px solid var(--p3); }
+
+    /* ── CARDS ── */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      margin-bottom: 12px;
+      overflow: hidden;
+    }
+    .card-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 14px 16px;
+      cursor: pointer;
+      user-select: none;
+      transition: background 0.15s;
+    }
+    .card-header:hover { background: var(--surface2); }
+    .card-icon { font-size: 18px; }
+    .card-title { font-weight: 600; font-size: 14px; flex: 1; }
+    .card-chevron { color: var(--text-muted); transition: transform 0.25s; font-size: 12px; }
+    .card.open .card-chevron { transform: rotate(180deg); }
+    .card-actions { display: flex; gap: 6px; }
+
+    .btn-copy {
+      background: var(--surface2);
+      color: var(--text-muted);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 3px 10px;
+      font-size: 11px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .btn-copy:hover { color: var(--text); border-color: var(--accent); }
+    .btn-copy.copied { color: var(--p3); border-color: var(--p3); }
+
+    .card-body { display: none; padding: 0 16px 16px; border-top: 1px solid var(--border); }
+    .card.open .card-body { display: block; }
+
+    /* ── SUMMARY CARD ── */
+    .summary-text { color: var(--text); line-height: 1.7; padding-top: 14px; font-size: 14px; }
+
+    /* ── CLASSIFICATIONS TABLE ── */
+    .cls-table { width: 100%; border-collapse: collapse; margin-top: 14px; font-size: 13px; }
+    .cls-table th { text-align: left; color: var(--text-muted); font-weight: 600; padding: 6px 10px; border-bottom: 1px solid var(--border); font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; }
+    .cls-table td { padding: 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
+    .cls-table tr:last-child td { border-bottom: none; }
+    .cls-table tr:hover td { background: var(--surface2); }
+    .issue-type-badge {
+      display: inline-block;
+      background: var(--accent-dim);
+      color: var(--accent);
+      border-radius: 4px;
+      padding: 2px 8px;
+      font-size: 11px;
+      font-family: monospace;
+      font-weight: 600;
+    }
+    .confidence-bar {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .bar-track { width: 60px; height: 5px; background: var(--border); border-radius: 3px; overflow: hidden; }
+    .bar-fill { height: 100%; border-radius: 3px; background: var(--accent); transition: width 0.5s; }
+    .evidence-lines { font-family: monospace; font-size: 11px; color: var(--text-muted); background: var(--surface2); padding: 6px 8px; border-radius: 4px; border-left: 2px solid var(--accent); margin-top: 4px; white-space: pre-wrap; word-break: break-all; }
+
+    /* ── CHECKLIST CARD ── */
+    .checklist-body { padding-top: 14px; font-size: 13px; line-height: 1.8; }
+    .checklist-body h2 { font-size: 14px; font-weight: 700; margin: 20px 0 8px; color: var(--text); border-bottom: 1px solid var(--border); padding-bottom: 6px; }
+    .checklist-body h2:first-child { margin-top: 0; }
+    .checklist-body h3 { font-size: 13px; font-weight: 600; color: var(--text-muted); margin: 12px 0 6px; }
+    .checklist-body p { color: var(--text-muted); font-size: 12px; margin-bottom: 8px; }
+    .checklist-body hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
+    .checklist-item { display: flex; align-items: flex-start; gap: 8px; margin-bottom: 8px; }
+    .checklist-item input[type=checkbox] { margin-top: 3px; accent-color: var(--accent); flex-shrink: 0; cursor: pointer; width: 14px; height: 14px; }
+    .checklist-item label { cursor: pointer; color: var(--text); transition: color 0.2s; }
+    .checklist-item input:checked + label { color: var(--text-muted); text-decoration: line-through; }
+    .checklist-item .step-meta { display: block; font-size: 11px; color: var(--text-muted); font-family: monospace; margin-top: 2px; }
+    code { background: var(--surface2); padding: 1px 5px; border-radius: 3px; font-family: monospace; font-size: 11px; }
+
+    /* ── SLACK PREVIEW ── */
+    .slack-wrapper {
+      margin-top: 14px;
+      background: var(--slack-bg);
+      border-radius: var(--radius);
+      overflow: hidden;
+      font-family: 'Lato', -apple-system, sans-serif;
+    }
+    .slack-topbar {
+      background: var(--slack-sidebar);
+      padding: 8px 16px;
+      font-size: 12px;
+      color: rgba(255,255,255,0.7);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .slack-topbar strong { color: #fff; }
+    .slack-channel-icon { font-size: 14px; }
+    .slack-body { padding: 16px; }
+    .slack-msg { display: flex; gap: 10px; }
+    .slack-avatar {
+      width: 36px; height: 36px; border-radius: 6px;
+      background: linear-gradient(135deg, #e01e5a, #e8a838);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px; flex-shrink: 0;
+    }
+    .slack-content { flex: 1; min-width: 0; }
+    .slack-sender { font-weight: 700; font-size: 14px; color: #fff; }
+    .slack-timestamp { color: rgba(255,255,255,0.4); font-size: 11px; margin-left: 6px; }
+    .slack-block { margin-top: 6px; }
+    .slack-block-header {
+      background: #2c2d30;
+      border-radius: 4px 4px 0 0;
+      padding: 10px 14px;
+      font-weight: 700;
+      font-size: 16px;
+      color: #fff;
+      border-left: 3px solid transparent;
+    }
+    .slack-block-header.p0 { border-color: var(--p0); }
+    .slack-block-header.p1 { border-color: var(--p1); }
+    .slack-block-header.p2 { border-color: var(--p2); }
+    .slack-block-header.p3 { border-color: var(--p3); }
+    .slack-block-section {
+      background: #222529;
+      padding: 10px 14px;
+      color: rgba(255,255,255,0.85);
+      font-size: 13px;
+      line-height: 1.6;
+      white-space: pre-wrap;
+    }
+    .slack-block-divider { height: 1px; background: #393b3f; margin: 0; }
+    .slack-block-fields { background: #222529; padding: 10px 14px; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .slack-field-label { color: rgba(255,255,255,0.4); font-size: 11px; font-weight: 700; text-transform: uppercase; }
+    .slack-field-value { color: #fff; font-size: 13px; font-weight: 600; }
+    .slack-block-actions {
+      background: #222529;
+      padding: 10px 14px;
+      display: flex;
+      gap: 8px;
+      border-radius: 0 0 4px 4px;
+      border-top: 1px solid #393b3f;
+    }
+    .slack-btn {
+      padding: 6px 14px;
+      border-radius: 4px;
+      font-size: 13px;
+      font-weight: 600;
+      border: none;
+      cursor: default;
+    }
+    .slack-btn-primary { background: #007a5a; color: #fff; }
+    .slack-btn-danger { background: #e01e5a; color: #fff; }
+    .slack-btn-default { background: #383f47; color: #fff; }
+    .slack-mrkdwn b, .slack-mrkdwn strong { color: #fff; font-weight: 700; }
+    .slack-mrkdwn code { background: #383f47; color: #e8912d; padding: 1px 4px; border-radius: 3px; }
+
+    /* ── JIRA PREVIEW ── */
+    .jira-wrapper {
+      margin-top: 14px;
+      background: #fff;
+      border-radius: var(--radius);
+      overflow: hidden;
+      color: #172b4d;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    }
+    .jira-header {
+      background: var(--jira-blue);
+      padding: 10px 16px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .jira-logo { color: #fff; font-weight: 700; font-size: 13px; letter-spacing: 1px; }
+    .jira-breadcrumb { color: rgba(255,255,255,0.7); font-size: 12px; }
+    .jira-body { padding: 20px; }
+    .jira-key { color: var(--jira-blue); font-size: 12px; font-weight: 600; margin-bottom: 6px; }
+    .jira-summary { font-size: 18px; font-weight: 700; color: #172b4d; margin-bottom: 16px; line-height: 1.4; }
+    .jira-meta-row { display: flex; gap: 24px; margin-bottom: 16px; flex-wrap: wrap; }
+    .jira-meta-item { display: flex; flex-direction: column; gap: 3px; }
+    .jira-meta-label { font-size: 11px; color: #6b778c; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+    .jira-priority-badge {
+      display: inline-flex; align-items: center; gap: 4px;
+      padding: 3px 10px; border-radius: 3px;
+      font-size: 12px; font-weight: 700;
+    }
+    .priority-Critical { background: #ffecec; color: #de350b; }
+    .priority-High { background: #fff3e0; color: #ff7c00; }
+    .priority-Medium { background: #fffae6; color: #c97d00; }
+    .priority-Low { background: #e3fcef; color: #006644; }
+    .jira-type-badge { background: #dfe1e6; color: #42526e; padding: 3px 10px; border-radius: 3px; font-size: 12px; font-weight: 600; }
+    .jira-labels { display: flex; flex-wrap: wrap; gap: 4px; }
+    .jira-label { background: #dfe1e6; color: #172b4d; padding: 2px 8px; border-radius: 3px; font-size: 11px; font-weight: 500; }
+    .jira-divider { height: 1px; background: #dfe1e6; margin: 16px 0; }
+    .jira-desc-label { font-size: 12px; font-weight: 700; color: #6b778c; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
+    .jira-description { font-size: 13px; color: #172b4d; line-height: 1.7; white-space: pre-wrap; }
+    .jira-description h2 { font-size: 14px; font-weight: 700; margin: 12px 0 4px; color: #172b4d; }
+    .jira-description h3 { font-size: 13px; font-weight: 600; margin: 10px 0 4px; color: #42526e; }
+
+    /* ── AI REVIEW CARD ── */
+    .review-header-row { display: flex; align-items: center; gap: 16px; padding-top: 14px; flex-wrap: wrap; }
+    .score-gauge {
+      width: 64px; height: 64px; border-radius: 50%;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      font-weight: 800; font-size: 18px; border: 3px solid;
+      flex-shrink: 0;
+    }
+    .score-gauge .score-label { font-size: 9px; font-weight: 600; letter-spacing: 0.5px; margin-top: 1px; }
+    .score-high { border-color: var(--p3); color: var(--p3); background: var(--p3-bg); }
+    .score-mid  { border-color: var(--p2); color: var(--p2); background: var(--p2-bg); }
+    .score-low  { border-color: var(--p0); color: var(--p0); background: var(--p0-bg); }
+    .review-meta { flex: 1; min-width: 0; }
+    .review-verdict {
+      display: inline-block; padding: 3px 12px; border-radius: 20px;
+      font-size: 12px; font-weight: 700; margin-bottom: 6px;
+    }
+    .verdict-approved   { background: var(--p3-bg); color: var(--p3); border: 1px solid var(--p3); }
+    .verdict-needs_review { background: var(--p1-bg); color: var(--p1); border: 1px solid var(--p1); }
+    .reviewer-model-tag {
+      font-family: monospace; font-size: 11px; color: var(--text-muted);
+      background: var(--surface2); padding: 2px 8px; border-radius: 4px; display: inline-block;
+    }
+    .review-summary { color: var(--text); font-size: 13px; line-height: 1.6; margin-top: 8px; }
+    .review-sections { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 16px; }
+    @media (max-width: 600px) { .review-sections { grid-template-columns: 1fr; } }
+    .review-section { background: var(--surface2); border-radius: 6px; padding: 12px; }
+    .review-section-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
+    .review-section-title.flags   { color: var(--p1); }
+    .review-section-title.missed  { color: var(--p0); }
+    .review-section-title.strengths { color: var(--p3); }
+    .review-section-title.severity  { color: var(--accent); }
+    .review-list { list-style: none; display: flex; flex-direction: column; gap: 6px; }
+    .review-list li { font-size: 12px; color: var(--text-muted); display: flex; gap: 6px; }
+    .review-list li::before { content: '•'; flex-shrink: 0; }
+    .review-list.flags    li::before { color: var(--p1); }
+    .review-list.missed   li::before { color: var(--p0); }
+    .review-list.strengths li::before { color: var(--p3); }
+    .review-empty { font-size: 12px; color: var(--text-muted); font-style: italic; }
+    .severity-shift {
+      display: flex; align-items: center; gap: 8px; font-size: 13px; margin-top: 4px;
+    }
+    .sev-arrow { color: var(--p1); font-size: 16px; }
+
+    /* ── RAW JSON CARD ── */
+    .raw-pre {
+      background: var(--surface2);
+      border-radius: 4px;
+      padding: 12px;
+      font-family: monospace;
+      font-size: 11px;
+      color: var(--text-muted);
+      overflow-x: auto;
+      white-space: pre;
+      margin-top: 14px;
+      max-height: 400px;
+      overflow-y: auto;
+      line-height: 1.5;
+    }
+
+    /* ── ERROR STATE ── */
+    .error-card {
+      background: var(--p0-bg);
+      border: 1px solid var(--p0);
+      border-radius: var(--radius);
+      padding: 20px;
+      color: var(--p0);
+    }
+    .error-card h3 { margin-bottom: 8px; }
+    .error-card p { font-size: 13px; opacity: 0.85; }
+
+    /* ── UTILS ── */
+    .hidden { display: none !important; }
+    .mt8 { margin-top: 8px; }
+    .mt14 { margin-top: 14px; }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="header-logo"><span>⚡</span> DevOps Incident Analyzer</div>
+  <div class="model-badge" id="model-badge">loading model...</div>
+</header>
+
+<main>
+
+  <!-- ══ UPLOAD ══ -->
+  <div id="upload-section">
+    <div>
+      <div class="upload-title">Analyze an Incident</div>
+      <div class="upload-subtitle">Upload a plain-text log file to classify issues, assess severity, and generate remediation artifacts.</div>
+    </div>
+
+    <div id="drop-zone" onclick="document.getElementById('file-input').click()">
+      <div class="dz-icon">📂</div>
+      <div class="dz-label">Drop your log file here</div>
+      <div class="dz-sub">or click to browse — .log, .txt, any plain text</div>
+      <div class="dz-file-selected hidden" id="dz-filename"></div>
+    </div>
+    <input type="file" id="file-input" accept=".log,.txt,.text,text/plain" />
+
+    <div class="divider-or">or paste log text directly</div>
+
+    <textarea id="paste-area" placeholder="Paste log lines here...&#10;&#10;2026-05-09T07:46:23Z ERROR payment-service OOMKilled: container exceeded memory limit of 512Mi&#10;..."></textarea>
+
+    <div class="btn-row">
+      <button class="btn-primary" id="analyze-btn" onclick="startAnalysis()">⚡ Analyze Incident</button>
+      <span class="sample-hint">No log handy? <a onclick="loadSample()">Load the sample incident</a></span>
+    </div>
+  </div>
+
+  <!-- ══ PROGRESS ══ -->
+  <div id="progress-section">
+    <div class="progress-card">
+      <div class="progress-title" id="progress-title">Running multi-agent analysis...</div>
+      <div class="steps-row">
+        <div class="step-item" id="step-1">
+          <div class="step-dot">🔍</div>
+          <div class="step-label">Classifying Issues</div>
+        </div>
+        <div class="step-item" id="step-2">
+          <div class="step-dot">⚖️</div>
+          <div class="step-label">Reasoning Severity</div>
+        </div>
+        <div class="step-item" id="step-3">
+          <div class="step-dot">🛠️</div>
+          <div class="step-label">Mapping Remediation</div>
+        </div>
+        <div class="step-item" id="step-4">
+          <div class="step-dot">📦</div>
+          <div class="step-label">Formatting Outputs</div>
+        </div>
+        <div class="step-item" id="step-5">
+          <div class="step-dot">🤖</div>
+          <div class="step-label">AI Peer Review</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ ERROR ══ -->
+  <div id="error-section" class="hidden">
+    <div class="error-card">
+      <h3>⚠️ Analysis Failed</h3>
+      <p id="error-msg"></p>
+    </div>
+    <div class="btn-row mt8">
+      <button class="btn-secondary" onclick="resetToUpload()">← Try Again</button>
+    </div>
+  </div>
+
+  <!-- ══ RESULTS ══ -->
+  <div id="results-section">
+    <div class="results-header">
+      <div>
+        <div class="results-title">Incident Analysis Complete</div>
+        <div class="incident-id" id="result-incident-id"></div>
+      </div>
+      <div class="severity-badge" id="result-severity-badge"></div>
+      <div class="timing" id="result-timing"></div>
+      <div class="results-actions">
+        <button class="btn-secondary" id="download-btn" onclick="downloadAll()">⬇ Download All</button>
+        <button class="btn-secondary" onclick="resetToUpload()">← New Analysis</button>
+      </div>
+    </div>
+
+    <!-- Card: AI Review -->
+    <div class="card open" id="card-review">
+      <div class="card-header" onclick="toggleCard('card-review')">
+        <span class="card-icon">🤖</span>
+        <span class="card-title">AI Peer Review</span>
+        <div class="card-actions" onclick="event.stopPropagation()">
+          <button class="btn-copy" onclick="copyRaw('review')">Copy JSON</button>
+        </div>
+        <span class="card-chevron">▼</span>
+      </div>
+      <div class="card-body">
+        <div id="review-body"></div>
+      </div>
+    </div>
+
+    <!-- Card: Summary -->
+    <div class="card open" id="card-summary">
+      <div class="card-header" onclick="toggleCard('card-summary')">
+        <span class="card-icon">📋</span>
+        <span class="card-title">Incident Summary</span>
+        <div class="card-actions" onclick="event.stopPropagation()">
+          <button class="btn-copy" onclick="copyRaw('summary')">Copy</button>
+        </div>
+        <span class="card-chevron">▼</span>
+      </div>
+      <div class="card-body">
+        <div class="summary-text" id="summary-text"></div>
+      </div>
+    </div>
+
+    <!-- Card: Classifications -->
+    <div class="card open" id="card-classifications">
+      <div class="card-header" onclick="toggleCard('card-classifications')">
+        <span class="card-icon">🔍</span>
+        <span class="card-title">Classifications</span>
+        <div class="card-actions" onclick="event.stopPropagation()">
+          <button class="btn-copy" onclick="copyRaw('classifications')">Copy JSON</button>
+        </div>
+        <span class="card-chevron">▼</span>
+      </div>
+      <div class="card-body">
+        <table class="cls-table" id="cls-table">
+          <thead>
+            <tr>
+              <th>Issue Type</th>
+              <th>Services</th>
+              <th>Severity</th>
+              <th>Confidence</th>
+              <th>Evidence</th>
+            </tr>
+          </thead>
+          <tbody id="cls-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Card: Checklist -->
+    <div class="card" id="card-checklist">
+      <div class="card-header" onclick="toggleCard('card-checklist')">
+        <span class="card-icon">✅</span>
+        <span class="card-title">Remediation Checklist</span>
+        <div class="card-actions" onclick="event.stopPropagation()">
+          <button class="btn-copy" onclick="copyRaw('checklist')">Copy MD</button>
+        </div>
+        <span class="card-chevron">▼</span>
+      </div>
+      <div class="card-body">
+        <div class="checklist-body" id="checklist-body"></div>
+      </div>
+    </div>
+
+    <!-- Card: Slack Preview -->
+    <div class="card" id="card-slack">
+      <div class="card-header" onclick="toggleCard('card-slack')">
+        <span class="card-icon">💬</span>
+        <span class="card-title">Slack Card Preview</span>
+        <div class="card-actions" onclick="event.stopPropagation()">
+          <button class="btn-copy" onclick="copyRaw('slack_card')">Copy JSON</button>
+        </div>
+        <span class="card-chevron">▼</span>
+      </div>
+      <div class="card-body">
+        <div id="slack-preview"></div>
+      </div>
+    </div>
+
+    <!-- Card: JIRA Preview -->
+    <div class="card" id="card-jira">
+      <div class="card-header" onclick="toggleCard('card-jira')">
+        <span class="card-icon">🎫</span>
+        <span class="card-title">JIRA Ticket Preview</span>
+        <div class="card-actions" onclick="event.stopPropagation()">
+          <button class="btn-copy" onclick="copyRaw('jira_ticket')">Copy JSON</button>
+        </div>
+        <span class="card-chevron">▼</span>
+      </div>
+      <div class="card-body">
+        <div id="jira-preview"></div>
+      </div>
+    </div>
+
+    <!-- Card: Raw Analysis -->
+    <div class="card" id="card-raw">
+      <div class="card-header" onclick="toggleCard('card-raw')">
+        <span class="card-icon">🗂️</span>
+        <span class="card-title">Raw Analysis JSON</span>
+        <div class="card-actions" onclick="event.stopPropagation()">
+          <button class="btn-copy" onclick="copyRaw('analysis')">Copy JSON</button>
+        </div>
+        <span class="card-chevron">▼</span>
+      </div>
+      <div class="card-body">
+        <pre class="raw-pre" id="raw-analysis"></pre>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<script>
+// ── STATE ──
+let currentIncidentId = null;
+let currentArtifacts = null;
+let selectedFile = null;
+let progressTimer = null;
+
+// ── INIT ──
+(async function init() {
+  try {
+    const r = await fetch('/health');
+    const d = await r.json();
+    document.getElementById('model-badge').textContent = d.model || 'unknown model';
+  } catch {
+    document.getElementById('model-badge').textContent = 'model unknown';
+  }
+})();
+
+// ── DROP ZONE ──
+const dropZone = document.getElementById('drop-zone');
+const fileInput = document.getElementById('file-input');
+
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropZone.classList.remove('drag-over');
+  const f = e.dataTransfer.files[0];
+  if (f) setFile(f);
+});
+fileInput.addEventListener('change', () => { if (fileInput.files[0]) setFile(fileInput.files[0]); });
+
+function setFile(f) {
+  selectedFile = f;
+  const el = document.getElementById('dz-filename');
+  el.textContent = `📄 ${f.name} (${(f.size / 1024).toFixed(1)} KB)`;
+  el.classList.remove('hidden');
+  document.getElementById('paste-area').value = '';
+}
+
+async function loadSample() {
+  try {
+    const r = await fetch('/sample_logs/incident.log');
+    if (!r.ok) throw new Error();
+    const text = await r.text();
+    document.getElementById('paste-area').value = text;
+    selectedFile = null;
+    document.getElementById('dz-filename').classList.add('hidden');
+  } catch {
+    // fallback: just put a hint in the textarea
+    document.getElementById('paste-area').value =
+      '2026-05-09T07:46:23Z ERROR payment-service OOMKilled: container exceeded memory limit of 512Mi\n' +
+      '2026-05-09T07:47:12Z ERROR order-service PostgreSQL connection pool exhausted (max=20, active=20, waiting=47)\n' +
+      '2026-05-09T07:48:05Z ERROR notification-service ErrImagePull: failed to pull and unpack image: not found';
+  }
+}
+
+// ── PROGRESS ANIMATION ──
+const STEP_TIMING = [0, 2500, 5500, 9000]; // ms delays to advance each step
+
+const _progressTimers = [];
+
+function startProgressAnimation() {
+  function activateStep(i) {
+    for (let j = 1; j <= 5; j++) {
+      const el = document.getElementById(`step-${j}`);
+      el.classList.remove('active', 'done');
+      if (j < i) el.classList.add('done');
+      else if (j === i) el.classList.add('active');
+    }
+  }
+  activateStep(1);
+  _progressTimers.push(setTimeout(() => activateStep(2), 3000));
+  _progressTimers.push(setTimeout(() => activateStep(3), 7000));
+  _progressTimers.push(setTimeout(() => activateStep(4), 12000));
+  _progressTimers.push(setTimeout(() => activateStep(5), 16000));
+}
+
+function finishProgressAnimation() {
+  _progressTimers.forEach(clearTimeout);
+  _progressTimers.length = 0;
+  for (let j = 1; j <= 5; j++) {
+    const el = document.getElementById(`step-${j}`);
+    el.classList.remove('active');
+    el.classList.add('done');
+  }
+}
+
+// ── ANALYSIS ──
+async function startAnalysis() {
+  const pasteText = document.getElementById('paste-area').value.trim();
+  if (!selectedFile && !pasteText) {
+    alert('Please upload a log file or paste log text.');
+    return;
+  }
+
+  showSection('progress');
+  startProgressAnimation();
+
+  const formData = new FormData();
+  if (selectedFile) {
+    formData.append('file', selectedFile);
+  } else {
+    formData.append('log_text', pasteText);
+  }
+
+  try {
+    const response = await fetch('/analyze', { method: 'POST', body: formData });
+    const data = await response.json();
+    finishProgressAnimation();
+
+    if (data.status === 'error') {
+      showError(data.message || 'Unknown error');
+      return;
+    }
+
+    currentIncidentId = data.incident_id;
+    currentArtifacts = data.artifacts;
+    window._currentReview = data.review;
+    renderResults(data);
+    showSection('results');
+  } catch (err) {
+    finishProgressAnimation();
+    showError('Request failed: ' + err.message);
+  }
+}
+
+// ── RENDER ──
+function renderReview(review) {
+  const container = document.getElementById('review-body');
+  if (!review) {
+    container.innerHTML = `
+      <div style="display:flex;align-items:center;gap:10px;padding:16px 0;color:var(--text-muted)">
+        <span style="font-size:20px">⚠️</span>
+        <div>
+          <div style="font-weight:600;color:var(--text);margin-bottom:2px">Peer review unavailable</div>
+          <div style="font-size:12px">The reviewer model did not return a response. Check that <code>REVIEWER_MODEL</code> is set and reachable via OpenRouter.</div>
+        </div>
+      </div>`;
+    return;
+  }
+
+  const score = parseFloat(review.score || 0);
+  const scoreClass = score >= 7.5 ? 'score-high' : score >= 5 ? 'score-mid' : 'score-low';
+  const verdictClass = review.verdict === 'approved' ? 'verdict-approved' : 'verdict-needs_review';
+  const verdictLabel = review.verdict === 'approved' ? '✓ Approved' : '⚠ Needs Review';
+
+  const sevShift = review.suggested_severity && review.suggested_severity !== review.severity_assessment
+    ? `<div class="severity-shift">
+        <span class="severity-badge badge-${(currentArtifacts?.analysis?.severity?.overall_severity||'P?')}">${currentArtifacts?.analysis?.severity?.overall_severity||'?'}</span>
+        <span class="sev-arrow">→</span>
+        <span class="severity-badge badge-${review.suggested_severity}">${review.suggested_severity}</span>
+        <span style="font-size:12px;color:var(--text-muted)">suggested by reviewer</span>
+       </div>` : '';
+
+  const flagsHtml = (review.flags||[]).length
+    ? `<ul class="review-list flags">${(review.flags||[]).map(f=>`<li>${esc(f)}</li>`).join('')}</ul>`
+    : `<span class="review-empty">No flags raised</span>`;
+
+  const missedHtml = (review.missed_issues||[]).length
+    ? `<ul class="review-list missed">${(review.missed_issues||[]).map(m=>`<li>${esc(m)}</li>`).join('')}</ul>`
+    : `<span class="review-empty">None detected</span>`;
+
+  const strengthsHtml = (review.strengths||[]).length
+    ? `<ul class="review-list strengths">${(review.strengths||[]).map(s=>`<li>${esc(s)}</li>`).join('')}</ul>`
+    : `<span class="review-empty">—</span>`;
+
+  container.innerHTML = `
+    <div class="review-header-row">
+      <div class="score-gauge ${scoreClass}">
+        ${score.toFixed(1)}
+        <span class="score-label">/ 10</span>
+      </div>
+      <div class="review-meta">
+        <div>
+          <span class="review-verdict ${verdictClass}">${verdictLabel}</span>
+          &nbsp;
+          <span class="reviewer-model-tag">reviewed by ${esc(review.reviewer_model||'unknown')}</span>
+        </div>
+        ${sevShift}
+        <div class="review-summary">${esc(review.reviewer_summary||'')}</div>
+      </div>
+    </div>
+    <div class="review-sections">
+      <div class="review-section">
+        <div class="review-section-title flags">⚠ Flags</div>
+        ${flagsHtml}
+      </div>
+      <div class="review-section">
+        <div class="review-section-title missed">🔍 Missed Issues</div>
+        ${missedHtml}
+      </div>
+      <div class="review-section" style="grid-column:1/-1">
+        <div class="review-section-title strengths">✓ Strengths</div>
+        ${strengthsHtml}
+      </div>
+    </div>
+  `;
+}
+
+function renderResults(data) {
+  const { incident_id, processing_time_ms, artifacts } = data;
+  const sev = artifacts.analysis?.severity?.overall_severity || 'P?';
+
+  document.getElementById('result-incident-id').textContent = incident_id;
+  document.getElementById('result-timing').textContent = `Analyzed in ${(processing_time_ms / 1000).toFixed(1)}s`;
+  document.getElementById('download-btn').dataset.id = incident_id;
+
+  const badge = document.getElementById('result-severity-badge');
+  badge.textContent = sev;
+  badge.className = `severity-badge badge-${sev}`;
+
+  // Summary
+  document.getElementById('summary-text').textContent = artifacts.summary || '';
+
+  // Classifications
+  renderClassifications(artifacts);
+
+  // Checklist
+  renderChecklist(artifacts.checklist || '');
+
+  // Slack
+  renderSlack(artifacts.slack_card);
+
+  // JIRA
+  renderJira(artifacts.jira_ticket);
+
+  // AI Review
+  renderReview(data.review);
+
+  // Raw
+  document.getElementById('raw-analysis').textContent =
+    JSON.stringify(artifacts.analysis, null, 2);
+}
+
+function renderClassifications(artifacts) {
+  const tbody = document.getElementById('cls-tbody');
+  tbody.innerHTML = '';
+  const classifications = artifacts.analysis?.classifications || [];
+  const perIssue = artifacts.analysis?.severity?.per_issue || [];
+
+  classifications.forEach(c => {
+    const sevItem = perIssue.find(i => i.issue_type === c.issue_type) || {};
+    const sev = sevItem.severity || '?';
+    const pct = Math.round(c.confidence * 100);
+    const row = document.createElement('tr');
+    row.innerHTML = `
+      <td><span class="issue-type-badge">${esc(c.issue_type)}</span></td>
+      <td>${esc((c.affected_services || []).join(', '))}</td>
+      <td><span class="severity-badge badge-${sev}" style="font-size:11px;padding:2px 8px">${sev}</span></td>
+      <td>
+        <div class="confidence-bar">
+          <div class="bar-track"><div class="bar-fill" style="width:${pct}%"></div></div>
+          <span>${pct}%</span>
+        </div>
+      </td>
+      <td>
+        <div class="evidence-lines">${esc((c.evidence_lines || []).slice(0, 2).join('\n'))}</div>
+      </td>
+    `;
+    tbody.appendChild(row);
+  });
+}
+
+function renderChecklist(md) {
+  const container = document.getElementById('checklist-body');
+  container.innerHTML = '';
+  let checkboxIndex = 0;
+
+  const lines = md.split('\n');
+  let i = 0;
+  while (i < lines.length) {
+    const line = lines[i];
+
+    if (line.startsWith('## ')) {
+      const h = document.createElement('h2');
+      h.textContent = line.slice(3);
+      container.appendChild(h);
+    } else if (line.startsWith('### ')) {
+      const h = document.createElement('h3');
+      h.textContent = line.slice(4);
+      container.appendChild(h);
+    } else if (line.startsWith('# ')) {
+      // skip top-level title — already shown in card header
+    } else if (line.startsWith('---')) {
+      container.appendChild(document.createElement('hr'));
+    } else if (line.match(/^- \[[ x]\]/)) {
+      const checked = line.startsWith('- [x]');
+      const text = line.slice(6).trim();
+      // Look ahead for meta line (indented with '  - ')
+      let meta = '';
+      if (i + 1 < lines.length && lines[i + 1].startsWith('  - ')) {
+        meta = lines[i + 1].slice(4);
+        i++;
+      }
+      const id = `cb-${checkboxIndex++}`;
+      const item = document.createElement('div');
+      item.className = 'checklist-item';
+      item.innerHTML = `
+        <input type="checkbox" id="${id}" ${checked ? 'checked' : ''}>
+        <label for="${id}">
+          ${esc(text)}
+          ${meta ? `<span class="step-meta">${esc(meta)}</span>` : ''}
+        </label>
+      `;
+      container.appendChild(item);
+    } else if (line.startsWith('**') || line.trim()) {
+      const p = document.createElement('p');
+      p.textContent = line.replace(/\*\*/g, '');
+      container.appendChild(p);
+    }
+    i++;
+  }
+}
+
+function renderSlack(card) {
+  const container = document.getElementById('slack-preview');
+  if (!card || !card.blocks) { container.innerHTML = '<p style="color:var(--text-muted);padding:14px 0">No Slack card generated.</p>'; return; }
+
+  const sev = (card.text || '').match(/P[0-3]/) ? card.text.match(/P[0-3]/)[0] : 'P1';
+  const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+  let blocksHtml = '';
+  card.blocks.forEach(block => {
+    if (block.type === 'header') {
+      blocksHtml += `<div class="slack-block-header ${sev.toLowerCase()}">${esc(block.text?.text || '')}</div>`;
+    } else if (block.type === 'section') {
+      if (block.fields) {
+        blocksHtml += '<div class="slack-block-fields">';
+        block.fields.forEach(f => {
+          const parts = f.text.split('\n');
+          blocksHtml += `<div><div class="slack-field-label">${renderMrkdwn(parts[0])}</div><div class="slack-field-value">${renderMrkdwn(parts.slice(1).join('\n'))}</div></div>`;
+        });
+        blocksHtml += '</div>';
+      } else {
+        blocksHtml += `<div class="slack-block-section slack-mrkdwn">${renderMrkdwn(block.text?.text || '')}</div>`;
+      }
+    } else if (block.type === 'divider') {
+      blocksHtml += '<div class="slack-block-divider"></div>';
+    } else if (block.type === 'actions') {
+      blocksHtml += '<div class="slack-block-actions">';
+      (block.elements || []).forEach(el => {
+        const cls = el.style === 'primary' ? 'slack-btn-primary' : el.style === 'danger' ? 'slack-btn-danger' : 'slack-btn-default';
+        blocksHtml += `<button class="slack-btn ${cls}" disabled>${esc(el.text?.text || '')}</button>`;
+      });
+      blocksHtml += '</div>';
+    }
+  });
+
+  container.innerHTML = `
+    <div class="slack-wrapper">
+      <div class="slack-topbar">
+        <span class="slack-channel-icon">#</span>
+        <strong>incidents</strong>
+        <span style="margin-left:auto;opacity:0.5">Preview — no messages actually sent</span>
+      </div>
+      <div class="slack-body">
+        <div class="slack-msg">
+          <div class="slack-avatar">🤖</div>
+          <div class="slack-content">
+            <span class="slack-sender">IncidentBot</span>
+            <span class="slack-timestamp">${now}</span>
+            <div class="slack-block">${blocksHtml}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function renderJira(ticket) {
+  const container = document.getElementById('jira-preview');
+  if (!ticket || !ticket.fields) { container.innerHTML = '<p style="color:var(--text-muted);padding:14px 0">No JIRA ticket generated.</p>'; return; }
+
+  const f = ticket.fields;
+  const priority = f.priority?.name || 'Medium';
+  const labels = (f.labels || []).map(l => `<span class="jira-label">${esc(l)}</span>`).join('');
+  const components = (f.components || []).map(c => `<span class="jira-label">${esc(c.name)}</span>`).join('');
+
+  // Format JIRA markup to readable HTML
+  const descHtml = (f.description || '')
+    .replace(/h2\. /g, '§H2§')
+    .replace(/h3\. /g, '§H3§')
+    .split('\n')
+    .map(l => {
+      if (l.startsWith('§H2§')) return `<h2>${esc(l.slice(4))}</h2>`;
+      if (l.startsWith('§H3§')) return `<h3>${esc(l.slice(4))}</h3>`;
+      return l ? `<span>${esc(l)}</span><br>` : '<br>';
+    })
+    .join('');
+
+  container.innerHTML = `
+    <div class="jira-wrapper">
+      <div class="jira-header">
+        <div class="jira-logo">JIRA</div>
+        <div class="jira-breadcrumb">OPS / New Incident</div>
+        <div style="margin-left:auto;color:rgba(255,255,255,0.5);font-size:11px">Preview — ticket not created</div>
+      </div>
+      <div class="jira-body">
+        <div class="jira-key">OPS-PREVIEW</div>
+        <div class="jira-summary">${esc(f.summary || '')}</div>
+        <div class="jira-meta-row">
+          <div class="jira-meta-item">
+            <div class="jira-meta-label">Type</div>
+            <div><span class="jira-type-badge">🔥 ${esc(f.issuetype?.name || 'Incident')}</span></div>
+          </div>
+          <div class="jira-meta-item">
+            <div class="jira-meta-label">Priority</div>
+            <div><span class="jira-priority-badge priority-${priority}">${priorityIcon(priority)} ${priority}</span></div>
+          </div>
+          <div class="jira-meta-item">
+            <div class="jira-meta-label">Project</div>
+            <div style="font-size:13px;font-weight:600;color:#172b4d">${esc(f.project?.key || 'OPS')}</div>
+          </div>
+          <div class="jira-meta-item">
+            <div class="jira-meta-label">Components</div>
+            <div class="jira-labels">${components}</div>
+          </div>
+        </div>
+        <div class="jira-meta-item" style="margin-bottom:12px">
+          <div class="jira-meta-label">Labels</div>
+          <div class="jira-labels mt8">${labels}</div>
+        </div>
+        <div class="jira-divider"></div>
+        <div class="jira-desc-label">Description</div>
+        <div class="jira-description">${descHtml}</div>
+      </div>
+    </div>
+  `;
+}
+
+function priorityIcon(p) {
+  return { Critical: '🔴', High: '🟠', Medium: '🟡', Low: '🟢' }[p] || '⚪';
+}
+
+function renderMrkdwn(text) {
+  return esc(text)
+    .replace(/\*([^*]+)\*/g, '<strong>$1</strong>')
+    .replace(/`([^`]+)`/g, '<code>$1</code>');
+}
+
+function esc(s) {
+  return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// ── COPY ──
+async function copyRaw(key) {
+  let text = '';
+  if (!currentArtifacts) return;
+  if (key === 'summary') text = currentArtifacts.summary || '';
+  else if (key === 'checklist') text = currentArtifacts.checklist || '';
+  else if (key === 'classifications') text = JSON.stringify(currentArtifacts.analysis?.classifications, null, 2);
+  else if (key === 'review') text = JSON.stringify(window._currentReview, null, 2);
+  else text = JSON.stringify(currentArtifacts[key], null, 2);
+  try {
+    await navigator.clipboard.writeText(text);
+    // flash button
+    const btns = document.querySelectorAll('.btn-copy');
+    // find the right one by event — simpler: just use a quick approach
+  } catch {}
+}
+
+// ── DOWNLOAD ──
+function downloadAll() {
+  if (!currentIncidentId) return;
+  window.location.href = `/download/${currentIncidentId}`;
+}
+
+// ── CARD TOGGLE ──
+function toggleCard(id) {
+  document.getElementById(id).classList.toggle('open');
+}
+
+// ── SECTION SWITCHING ──
+function showSection(name) {
+  document.getElementById('upload-section').style.display = name === 'upload' ? 'flex' : 'none';
+  document.getElementById('progress-section').style.display = name === 'progress' ? 'block' : 'none';
+  document.getElementById('results-section').style.display = name === 'results' ? 'block' : 'none';
+  document.getElementById('error-section').classList.toggle('hidden', name !== 'error');
+}
+
+function showError(msg) {
+  document.getElementById('error-msg').textContent = msg;
+  showSection('error');
+}
+
+function resetToUpload() {
+  selectedFile = null;
+  currentIncidentId = null;
+  currentArtifacts = null;
+  document.getElementById('paste-area').value = '';
+  document.getElementById('dz-filename').classList.add('hidden');
+  document.getElementById('file-input').value = '';
+  showSection('upload');
+}
+
+// start on upload
+showSection('upload');
+</script>
+
+</body>
+</html>
