@@ -1,0 +1,43 @@
+{
+  "fields": {
+    "project": {
+      "key": "OPS"
+    },
+    "summary": "[P1] inc-a26a8228 \u2014 5 issues on redis-cache, postgres-primary, kubernetes",
+    "description": "h2. Incident Summary\nProduction is experiencing a P1 incident centered on `payment-service`: `DB_CONN_TIMEOUT` errors, PostgreSQL pool exhaustion on `postgres-primary` (`active_connections=195 max_connections=200` and `FATAL: remaining connection slots are reserved for non-replication superuser connections`), `java.lang.OutOfMemoryError: Java heap space`, and `CrashLoopBackOff/OOMKilled` restarts on pod `payment-service-7d9f84c9b6-rx2pm`.  \nThe impact extends to `postgres-primary`, `api-gateway`, `auth-service`, `redis-cache`, `kubelet`, `kubernetes`, and `deployment-controller`; `api-gateway` is returning 401s from auth timeouts, and `payment-service` availability is down to `1/6` replicas after the `v2.8.4` deployment.  \nOverall severity is P1 with immediate user impact on payment transaction creation and authenticated API access, causing intermittent unavailability and elevated 401/timeout failures in production.  \nThe single most critical next step is to roll back `payment-service` from `v2.8.4` to `v2.8.3` immediately to stop the deployment from amplifying DB pressure and crash loops.\n\nh2. Issues Detected\nh3. DB_TIMEOUT \u2014 P1\n*Services:* payment-service, postgres-primary, api-gateway\n*Description:* The payment-service is experiencing database connection timeouts and PostgreSQL connection pool exhaustion.\n*Severity Justification:* This is impacting the payment-service in production and is already cascading to the api-gateway, with PostgreSQL connection pool exhaustion indicating the problem is persistent and service-affecting. Because payment is revenue-critical and the errors are repeated, this is major degradation with high user impact.\n\nh3. OOM_KILL \u2014 P1\n*Services:* payment-service, kubelet, kubernetes\n*Description:* The payment-service pod is running out of memory and is being killed and restarted by Kubernetes.\n*Severity Justification:* The payment-service pod in prod is crash looping due to OOMKilled and Java heap space errors, so the service is unstable and likely intermittently unavailable. Since this is a critical payment component with repeated restarts, it represents major degradation and significant user impact, though not a confirmed full outage.\n\nh3. DB_TIMEOUT \u2014 P1\n*Services:* postgres-primary, payment-service\n*Description:* PostgreSQL is showing slow queries and lock waits that are likely contributing to payment transaction delays.\n*Severity Justification:* This is impacting the payment-service in production and is already cascading to the api-gateway, with PostgreSQL connection pool exhaustion indicating the problem is persistent and service-affecting. Because payment is revenue-critical and the errors are repeated, this is major degradation with high user impact.\n\nh3. AUTH_ERROR \u2014 P1\n*Services:* auth-service, redis-cache, api-gateway\n*Description:* Authentication is failing because Redis session lookups are timing out during token validation.\n*Severity Justification:* Authentication failures are affecting the auth-service and propagating to the api-gateway, which means users cannot reliably validate tokens or access protected endpoints. Even though the root cause is Redis latency, auth is a critical service and repeated 401 timeouts in production create broad user-facing impact.\n\nh3. DEPLOY_FAILURE \u2014 P1\n*Services:* payment-service, deployment-controller, kubernetes\n*Description:* A recent payment-service deployment appears to have increased error rates and reduced availability.\n*Severity Justification:* The prod payment-service deployment has reduced availability to 1 of 6 replicas and increased error rates after the release, showing a clear production regression. Because this affects a critical payment path and is already reducing capacity significantly, it is a major degradation with substantial blast radius.\n\nh2. Remediation\nSee attached checklist for ordered fix steps.",
+    "issuetype": {
+      "name": "Incident"
+    },
+    "priority": {
+      "name": "High"
+    },
+    "labels": [
+      "incident",
+      "p1",
+      "auto-generated",
+      "db-timeout",
+      "oom-kill",
+      "db-timeout",
+      "auth-error",
+      "deploy-failure"
+    ],
+    "components": [
+      {
+        "name": "Platform"
+      },
+      {
+        "name": "On-Call"
+      }
+    ],
+    "customfield_affected_services": [
+      "redis-cache",
+      "postgres-primary",
+      "kubernetes",
+      "api-gateway",
+      "payment-service",
+      "kubelet",
+      "auth-service",
+      "deployment-controller"
+    ]
+  }
+}

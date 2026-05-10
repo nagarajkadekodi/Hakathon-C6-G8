@@ -1,0 +1,76 @@
+{
+  "blocks": [
+    {
+      "type": "header",
+      "text": {
+        "type": "plain_text",
+        "text": ":red_circle: P1 Incident \u2014 inc-a2966527"
+      }
+    },
+    {
+      "type": "divider"
+    },
+    {
+      "type": "section",
+      "text": {
+        "type": "mrkdwn",
+        "text": "Production is experiencing multiple P1 failures: `payment-service` is returning `DB_CONN_TIMEOUT`, `PAYMENT_INIT_FAILED`, `OutOfMemoryError: Java heap space`, and `OOMKilled`/`CrashLoopBackOff` events, while `api-gateway` is returning 504s on `POST /api/v1/payments` and 401s on `GET /api/v1/profile` due to `auth-service` token validation timeouts from Redis. Affected services are `payment-service`, `api-gateway`, `postgres-primary`, `auth-service`, `redis-cache`, and the rollout for `payment-service` `v2.8.4` is degraded with only 1 of 6 replicas available. Overall severity is P1 with immediate user impact on payment submission, payment initialization, and authenticated access. The single most critical next step is to rollback or stabilize `payment-service` `v2.8.4` and stop the crash loop/OOM condition while relieving pressure on `postgres-primary`."
+      }
+    },
+    {
+      "type": "divider"
+    },
+    {
+      "type": "section",
+      "text": {
+        "type": "mrkdwn",
+        "text": "*Issues Identified:*\n\u2022 *DB_TIMEOUT* on `api-gateway, payment-service, postgres-primary` \u2014 P1 (confidence: 99%)\n\u2022 *OOM_KILL* on `payment-service, payment-service-7d9f84c9b6-rx2pm` \u2014 P1 (confidence: 99%)\n\u2022 *DB_TIMEOUT* on `postgres-primary, payment-service` \u2014 P1 (confidence: 92%)\n\u2022 *AUTH_ERROR* on `auth-service, api-gateway, redis-cache` \u2014 P1 (confidence: 97%)\n\u2022 *DEPLOY_FAILURE* on `deployment-controller, payment-service` \u2014 P1 (confidence: 84%)"
+      }
+    },
+    {
+      "type": "section",
+      "fields": [
+        {
+          "type": "mrkdwn",
+          "text": "*Overall Severity:*\nP1"
+        },
+        {
+          "type": "mrkdwn",
+          "text": "*Issues Found:*\n5"
+        }
+      ]
+    },
+    {
+      "type": "actions",
+      "elements": [
+        {
+          "type": "button",
+          "text": {
+            "type": "plain_text",
+            "text": "View Runbook"
+          },
+          "style": "primary",
+          "value": "view_runbook"
+        },
+        {
+          "type": "button",
+          "text": {
+            "type": "plain_text",
+            "text": "Acknowledge"
+          },
+          "value": "acknowledge"
+        },
+        {
+          "type": "button",
+          "text": {
+            "type": "plain_text",
+            "text": "Escalate"
+          },
+          "style": "danger",
+          "value": "escalate"
+        }
+      ]
+    }
+  ],
+  "text": "P1 Incident: inc-a2966527"
+}

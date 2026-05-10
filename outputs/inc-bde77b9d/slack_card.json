@@ -1,0 +1,76 @@
+{
+  "blocks": [
+    {
+      "type": "header",
+      "text": {
+        "type": "plain_text",
+        "text": ":red_circle: P1 Incident \u2014 inc-bde77b9d"
+      }
+    },
+    {
+      "type": "divider"
+    },
+    {
+      "type": "section",
+      "text": {
+        "type": "mrkdwn",
+        "text": "Payment-service is failing due to PostgreSQL connection pool exhaustion and DB timeouts (`DB_CONN_TIMEOUT`, `FATAL: remaining connection slots are reserved...`), and the same pod is also crashing with `java.lang.OutOfMemoryError: Java heap space` and `OOMKilled`/`CrashLoopBackOff`. The blast radius includes `payment-service`, `postgres-primary`, `api-gateway`, `kubelet`/`kubernetes`, plus secondary auth degradation in `auth-service` and `redis-cache` from Redis session lookup timeouts causing 401s. Overall severity is P1 with immediate user impact on payment submissions and some authenticated requests failing or timing out, including 502/504s from `api-gateway` on `/api/v1/payments`. The single most critical next step is to roll back `payment-service` from `v2.8.4` to `v2.8.3` and immediately relieve pressure on `postgres-primary` while restoring pod memory headroom."
+      }
+    },
+    {
+      "type": "divider"
+    },
+    {
+      "type": "section",
+      "text": {
+        "type": "mrkdwn",
+        "text": "*Issues Identified:*\n\u2022 *DB_TIMEOUT* on `payment-service, postgres-primary, api-gateway` \u2014 P1 (confidence: 99%)\n\u2022 *OOM_KILL* on `payment-service, kubelet, kubernetes` \u2014 P1 (confidence: 99%)\n\u2022 *NETWORK_ERROR* on `api-gateway, payment-service` \u2014 P1 (confidence: 89%)\n\u2022 *AUTH_ERROR* on `auth-service, redis-cache, api-gateway` \u2014 P1 (confidence: 96%)\n\u2022 *DEPLOY_FAILURE* on `deployment-controller, payment-service, kubernetes` \u2014 P2 (confidence: 83%)"
+      }
+    },
+    {
+      "type": "section",
+      "fields": [
+        {
+          "type": "mrkdwn",
+          "text": "*Overall Severity:*\nP1"
+        },
+        {
+          "type": "mrkdwn",
+          "text": "*Issues Found:*\n5"
+        }
+      ]
+    },
+    {
+      "type": "actions",
+      "elements": [
+        {
+          "type": "button",
+          "text": {
+            "type": "plain_text",
+            "text": "View Runbook"
+          },
+          "style": "primary",
+          "value": "view_runbook"
+        },
+        {
+          "type": "button",
+          "text": {
+            "type": "plain_text",
+            "text": "Acknowledge"
+          },
+          "value": "acknowledge"
+        },
+        {
+          "type": "button",
+          "text": {
+            "type": "plain_text",
+            "text": "Escalate"
+          },
+          "style": "danger",
+          "value": "escalate"
+        }
+      ]
+    }
+  ],
+  "text": "P1 Incident: inc-bde77b9d"
+}

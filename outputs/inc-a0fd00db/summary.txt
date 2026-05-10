@@ -1,0 +1,4 @@
+Production is experiencing four concurrent P1 issues: `payment-service` is failing with `DB_CONN_TIMEOUT` and PostgreSQL `FATAL: remaining connection slots are reserved...` errors from connection pool exhaustion, the `payment-service` pod is also crash-looping with `java.lang.OutOfMemoryError: Java heap space` and `OOMKilled`, `auth-service` is returning 401s due to Redis session lookup timeouts, and `payment-service` v2.8.4 is degraded with `available_replicas=1/6` after a recent deployment.  
+Affected services are `payment-service`, `postgres-primary`, `api-gateway`, `auth-service`, `redis-cache`, `kubelet`, `kubernetes`, and `deployment-controller`.  
+Overall severity is P1 with immediate user impact on payment transactions, profile access, and authentication, plus reduced availability of the payment path.  
+The single most critical next step is to roll back `payment-service` from v2.8.4 to v2.8.3 and restore replica availability while stopping the error spike.

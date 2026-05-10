@@ -1,0 +1,38 @@
+{
+  "fields": {
+    "project": {
+      "key": "OPS"
+    },
+    "summary": "[P1] inc-39613be6 \u2014 4 issues on notification-service, order-service, auth-service",
+    "description": "h2. Incident Summary\npayment-service is repeatedly OOMKilled after exceeding its 512Mi memory limit, and order-service is hitting PostgreSQL connection pool exhaustion with max=20, active=20, and 47 waiting requests; notification-service also failed to start with ErrImagePull: image not found, and auth-service logged JWT validation failures due to signature mismatch. Affected services are payment-service, order-service, notification-service, and auth-service. Overall severity is P1 because payment and order are critical customer flows, and users are seeing transaction degradation, delayed or failing order operations, plus partial auth and notification impact. The single most critical next step is to immediately scale out payment-service and raise or relieve its memory pressure to stop the repeated OOM kills.\n\nh2. Issues Detected\nh3. OOM_KILL \u2014 P1\n*Services:* payment-service\n*Description:* payment-service was killed for exceeding its memory limit and experienced repeated OOM kills.\n*Severity Justification:* This is in payment-service, which is a critical revenue-path system, and repeated OOM kills indicate persistent instability rather than a one-off crash. Even though the blast radius is currently one service, payment processing degradation can block transactions and put SLA at risk.\n\nh3. DB_TIMEOUT \u2014 P1\n*Services:* order-service\n*Description:* order-service is experiencing database access failure due to an exhausted PostgreSQL connection pool.\n*Severity Justification:* Order-service is critical and the exhausted PostgreSQL pool shows active waiting requests, meaning user operations are being delayed or failing. The persistence of the pool saturation and the likely impact on order creation makes this a major degradation with significant user impact.\n\nh3. DEPLOY_FAILURE \u2014 P2\n*Services:* notification-service\n*Description:* notification-service failed to start because the container image could not be pulled.\n*Severity Justification:* Notification-service is lower criticality than payment, auth, or order, and the failure appears limited to one service failing to start due to an image pull issue. This is a partial degradation with a clear workaround in deployment/rollback or fixing the image reference.\n\nh3. AUTH_ERROR \u2014 P2\n*Services:* auth-service\n*Description:* auth-service rejected a JWT during validation because the signature did not match.\n*Severity Justification:* Auth-service is a critical system, but the evidence shows a single JWT validation warning rather than widespread repeated failures or an outage. This looks like a subset-of-requests failure or edge-case rejection, so it is degraded but not enough evidence for a major incident.\n\nh2. Remediation\nSee attached checklist for ordered fix steps.",
+    "issuetype": {
+      "name": "Incident"
+    },
+    "priority": {
+      "name": "High"
+    },
+    "labels": [
+      "incident",
+      "p1",
+      "auto-generated",
+      "oom-kill",
+      "db-timeout",
+      "deploy-failure",
+      "auth-error"
+    ],
+    "components": [
+      {
+        "name": "Platform"
+      },
+      {
+        "name": "On-Call"
+      }
+    ],
+    "customfield_affected_services": [
+      "notification-service",
+      "order-service",
+      "auth-service",
+      "payment-service"
+    ]
+  }
+}

@@ -1,0 +1,76 @@
+{
+  "blocks": [
+    {
+      "type": "header",
+      "text": {
+        "type": "plain_text",
+        "text": ":red_circle: P1 Incident \u2014 inc-69854f26"
+      }
+    },
+    {
+      "type": "divider"
+    },
+    {
+      "type": "section",
+      "text": {
+        "type": "mrkdwn",
+        "text": "The incident is a P1 production outage cluster centered on `payment-service`, with `DB_CONN_TIMEOUT` errors, PostgreSQL connection pool exhaustion on `postgres-primary` (`remaining connection slots are reserved...`), `java.lang.OutOfMemoryError: Java heap space` followed by `OOMKilled`/`CrashLoopBackOff`, and downstream 502/504s from `api-gateway` on `POST /api/v1/payments`.  \n`auth-service` and `redis-cache` are also affected by `TOKEN_VALIDATION_FAILED` / Redis session lookup timeouts causing 401s, while `kubernetes` and the `deployment-controller` report `payment-service` availability down to `1/6` replicas after rollout `v2.8.4`.  \nOverall severity is P1 with immediate user impact on checkout/payment completion and some login/session validation failures; users are seeing timeouts, gateway errors, and failed transactions in the production path.  \nThe single most critical next step is to roll back `payment-service` from `v2.8.4` to `v2.8.3` and stabilize it, while reducing load on `postgres-primary` to stop the cascade of DB timeouts and crash loops."
+      }
+    },
+    {
+      "type": "divider"
+    },
+    {
+      "type": "section",
+      "text": {
+        "type": "mrkdwn",
+        "text": "*Issues Identified:*\n\u2022 *DB_TIMEOUT* on `payment-service, postgres-primary` \u2014 P1 (confidence: 99%)\n\u2022 *OOM_KILL* on `payment-service, kubelet, kubernetes` \u2014 P1 (confidence: 99%)\n\u2022 *NETWORK_ERROR* on `api-gateway, payment-service` \u2014 P1 (confidence: 92%)\n\u2022 *AUTH_ERROR* on `auth-service, redis-cache, api-gateway` \u2014 P1 (confidence: 95%)\n\u2022 *DEPLOY_FAILURE* on `deployment-controller, payment-service, kubernetes` \u2014 P1 (confidence: 86%)"
+      }
+    },
+    {
+      "type": "section",
+      "fields": [
+        {
+          "type": "mrkdwn",
+          "text": "*Overall Severity:*\nP1"
+        },
+        {
+          "type": "mrkdwn",
+          "text": "*Issues Found:*\n5"
+        }
+      ]
+    },
+    {
+      "type": "actions",
+      "elements": [
+        {
+          "type": "button",
+          "text": {
+            "type": "plain_text",
+            "text": "View Runbook"
+          },
+          "style": "primary",
+          "value": "view_runbook"
+        },
+        {
+          "type": "button",
+          "text": {
+            "type": "plain_text",
+            "text": "Acknowledge"
+          },
+          "value": "acknowledge"
+        },
+        {
+          "type": "button",
+          "text": {
+            "type": "plain_text",
+            "text": "Escalate"
+          },
+          "style": "danger",
+          "value": "escalate"
+        }
+      ]
+    }
+  ],
+  "text": "P1 Incident: inc-69854f26"
+}

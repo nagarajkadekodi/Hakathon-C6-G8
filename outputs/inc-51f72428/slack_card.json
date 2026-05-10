@@ -1,0 +1,76 @@
+{
+  "blocks": [
+    {
+      "type": "header",
+      "text": {
+        "type": "plain_text",
+        "text": ":large_green_circle: P3 Incident \u2014 inc-51f72428"
+      }
+    },
+    {
+      "type": "divider"
+    },
+    {
+      "type": "section",
+      "text": {
+        "type": "mrkdwn",
+        "text": "No incident-causing error occurred: the only evidence is a successful `api-gateway` request to `GET /api/v1/accounts` with `status=200`, `latency_ms=84`, and upstream `account-service`, with no retries, 5xxs, timeouts, or other failure signals. The affected services listed are `api-gateway` and `account-service`, but both show normal behavior in the provided log line. Overall severity is `P3`, with no user-facing degradation or blast radius; immediate impact on users is none beyond a single normal request. The most critical next step is to verify this trace (`trace_id=7f3a91`) against `account-service` logs/metrics and close it as a false positive if no additional errors are found."
+      }
+    },
+    {
+      "type": "divider"
+    },
+    {
+      "type": "section",
+      "text": {
+        "type": "mrkdwn",
+        "text": "*Issues Identified:*\n\u2022 *UNKNOWN* on `api-gateway, account-service` \u2014 P3 (confidence: 95%)"
+      }
+    },
+    {
+      "type": "section",
+      "fields": [
+        {
+          "type": "mrkdwn",
+          "text": "*Overall Severity:*\nP3"
+        },
+        {
+          "type": "mrkdwn",
+          "text": "*Issues Found:*\n1"
+        }
+      ]
+    },
+    {
+      "type": "actions",
+      "elements": [
+        {
+          "type": "button",
+          "text": {
+            "type": "plain_text",
+            "text": "View Runbook"
+          },
+          "style": "primary",
+          "value": "view_runbook"
+        },
+        {
+          "type": "button",
+          "text": {
+            "type": "plain_text",
+            "text": "Acknowledge"
+          },
+          "value": "acknowledge"
+        },
+        {
+          "type": "button",
+          "text": {
+            "type": "plain_text",
+            "text": "Escalate"
+          },
+          "style": "danger",
+          "value": "escalate"
+        }
+      ]
+    }
+  ],
+  "text": "P3 Incident: inc-51f72428"
+}

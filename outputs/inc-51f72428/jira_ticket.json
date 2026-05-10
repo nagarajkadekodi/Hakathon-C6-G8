@@ -1,0 +1,33 @@
+{
+  "fields": {
+    "project": {
+      "key": "OPS"
+    },
+    "summary": "[P3] inc-51f72428 \u2014 1 issues on api-gateway, account-service",
+    "description": "h2. Incident Summary\nNo incident-causing error occurred: the only evidence is a successful `api-gateway` request to `GET /api/v1/accounts` with `status=200`, `latency_ms=84`, and upstream `account-service`, with no retries, 5xxs, timeouts, or other failure signals. The affected services listed are `api-gateway` and `account-service`, but both show normal behavior in the provided log line. Overall severity is `P3`, with no user-facing degradation or blast radius; immediate impact on users is none beyond a single normal request. The most critical next step is to verify this trace (`trace_id=7f3a91`) against `account-service` logs/metrics and close it as a false positive if no additional errors are found.\n\nh2. Issues Detected\nh3. UNKNOWN \u2014 P3\n*Services:* api-gateway, account-service\n*Description:* The log shows a successful API gateway request with no error or failure condition.\n*Severity Justification:* The evidence shows a normal successful request (HTTP 200) with no error, retry, or timeout signal. Impact appears limited to a single gateway call and there is no indication of user-facing degradation or cascading failure.\n\nh2. Remediation\nSee attached checklist for ordered fix steps.",
+    "issuetype": {
+      "name": "Incident"
+    },
+    "priority": {
+      "name": "Low"
+    },
+    "labels": [
+      "incident",
+      "p3",
+      "auto-generated",
+      "unknown"
+    ],
+    "components": [
+      {
+        "name": "Platform"
+      },
+      {
+        "name": "On-Call"
+      }
+    ],
+    "customfield_affected_services": [
+      "api-gateway",
+      "account-service"
+    ]
+  }
+}

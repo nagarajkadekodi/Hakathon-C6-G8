@@ -1,0 +1,76 @@
+{
+  "blocks": [
+    {
+      "type": "header",
+      "text": {
+        "type": "plain_text",
+        "text": ":red_circle: P1 Incident \u2014 inc-3a67d428"
+      }
+    },
+    {
+      "type": "divider"
+    },
+    {
+      "type": "section",
+      "text": {
+        "type": "mrkdwn",
+        "text": "payment-service is experiencing concurrent DB_TIMEOUT, OOM_KILL, and DEPLOY_FAILURE conditions: PostgreSQL on postgres-primary is near pool exhaustion with `FATAL: remaining connection slots are reserved for non-replication superuser connections`, the payment pod is CrashLoopBackOff with `java.lang.OutOfMemoryError: Java heap space` and `OOMKilled`, and the v2.8.4 deployment has only 1/6 replicas available.  \nAffected services are payment-service, postgres-primary, api-gateway, kubelet/kubernetes, and secondarily auth-service and redis-cache due to separate 401s from Redis session lookup timeouts.  \nOverall severity is P1, with immediate user impact on payment submissions and some authenticated requests: api-gateway is returning 504s/502s on `POST /api/v1/payments` and 401s on `/api/v1/profile`, causing failed or delayed transactions and login/session failures.  \nThe single most critical next step is to roll back payment-service from v2.8.4 to v2.8.3 immediately to restore availability while the DB and OOM issues are triaged."
+      }
+    },
+    {
+      "type": "divider"
+    },
+    {
+      "type": "section",
+      "text": {
+        "type": "mrkdwn",
+        "text": "*Issues Identified:*\n\u2022 *DB_TIMEOUT* on `payment-service, postgres-primary, api-gateway` \u2014 P1 (confidence: 99%)\n\u2022 *OOM_KILL* on `payment-service, kubelet, kubernetes` \u2014 P1 (confidence: 99%)\n\u2022 *NETWORK_ERROR* on `api-gateway, payment-service` \u2014 P1 (confidence: 94%)\n\u2022 *AUTH_ERROR* on `auth-service, redis-cache, api-gateway` \u2014 P1 (confidence: 95%)\n\u2022 *DB_TIMEOUT* on `postgres-primary, payment-service` \u2014 P1 (confidence: 89%)\n\u2022 *DEPLOY_FAILURE* on `deployment-controller, payment-service, kubernetes` \u2014 P2 (confidence: 88%)"
+      }
+    },
+    {
+      "type": "section",
+      "fields": [
+        {
+          "type": "mrkdwn",
+          "text": "*Overall Severity:*\nP1"
+        },
+        {
+          "type": "mrkdwn",
+          "text": "*Issues Found:*\n6"
+        }
+      ]
+    },
+    {
+      "type": "actions",
+      "elements": [
+        {
+          "type": "button",
+          "text": {
+            "type": "plain_text",
+            "text": "View Runbook"
+          },
+          "style": "primary",
+          "value": "view_runbook"
+        },
+        {
+          "type": "button",
+          "text": {
+            "type": "plain_text",
+            "text": "Acknowledge"
+          },
+          "value": "acknowledge"
+        },
+        {
+          "type": "button",
+          "text": {
+            "type": "plain_text",
+            "text": "Escalate"
+          },
+          "style": "danger",
+          "value": "escalate"
+        }
+      ]
+    }
+  ],
+  "text": "P1 Incident: inc-3a67d428"
+}

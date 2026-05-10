@@ -1,0 +1,38 @@
+{
+  "fields": {
+    "project": {
+      "key": "OPS"
+    },
+    "summary": "[P0] inc-bae69f64 \u2014 3 issues on notification-service, kubelet, api-gateway",
+    "description": "h2. Incident Summary\n**Incident inc-bae69f64 (Overall P0):** Three concurrent failures are affecting payment, order, and notification services. `payment-service` is in a CrashLoopBackOff due to repeated OOMKilled terminations after exceeding its 512Mi memory limit (3+ restarts since 07:46:23Z), effectively taking the revenue-critical payment path offline with potential in-flight transaction data loss risk. `order-service` has a fully exhausted PostgreSQL connection pool (20/20 active, 47 waiting), causing cascading 500s through `api-gateway` with its circuit breaker now open, blocking order creation broadly; concurrently, `notification-service` is stuck in ImagePullBackOff because image `registry.prod.internal/notification-service:v1.2.3` does not exist in the registry (P2, non-revenue path). **Immediate next step:** Patch the `payment-service` memory limit to 1024Mi now via `kubectl set resources deployment/payment-service -c payment-service --limits=memory=1024Mi --requests=memory=768Mi` to break the CrashLoopBackOff, then open the P0 escalation bridge per runbook `p0-escalation-notification`.\n\nh2. Issues Detected\nh3. OOM_KILL \u2014 P0\n*Services:* payment-service, kubelet\n*Description:* The payment-service container repeatedly exceeded its 512Mi memory limit, causing OOMKilled terminations and a CrashLoopBackOff cycle across at least 3 restarts.\n*Severity Justification:* The payment-service is a revenue-critical service in production, and repeated OOMKilled terminations driving a CrashLoopBackOff (3+ restarts) indicate it is effectively unavailable. With the container unable to stay running, payment processing is blocked, directly threatening revenue and potentially leaving in-flight transactions in an inconsistent state \u2014 constituting a data loss risk. The persistence and restart cycle suggest this is not a transient spike but an ongoing outage condition.\n\nh3. DB_TIMEOUT \u2014 P1\n*Services:* order-service, api-gateway\n*Description:* The order-service PostgreSQL connection pool became fully exhausted, causing repeated connection acquisition timeouts and cascading order creation failures for multiple users.\n*Severity Justification:* Order-service is a critical business function, and a fully exhausted PostgreSQL connection pool (20/20 active, 47 waiting) means order creation is broadly failing for a large number of concurrent users. The cascading impact to the api-gateway \u2014 which has opened its circuit breaker and is returning 500s \u2014 amplifies blast radius beyond order-service alone. This is a major degradation with significant user impact and SLA risk, but stops short of P0 as no data loss is indicated and the circuit breaker may be providing partial protection.\n\nh3. DEPLOY_FAILURE \u2014 P2\n*Services:* notification-service, kubelet\n*Description:* The notification-service deployment failed because the container image registry.prod.internal/notification-service:v1.2.3 could not be found, leaving the pod stuck in ImagePullBackOff.\n*Severity Justification:* Notification-service is a lower-criticality service (non-revenue, non-auth path), so an ImagePullBackOff leaving the pod stuck in Pending results in degraded notification delivery rather than a full revenue or data-integrity outage. The prod registry reference ('registry.prod.internal') does elevate concern, and users will not receive notifications, but core transactional flows are unaffected. A workaround exists by correcting the image tag or re-publishing the image to the registry.\n\nh2. Remediation\nSee attached checklist for ordered fix steps.",
+    "issuetype": {
+      "name": "Incident"
+    },
+    "priority": {
+      "name": "Critical"
+    },
+    "labels": [
+      "incident",
+      "p0",
+      "auto-generated",
+      "oom-kill",
+      "db-timeout",
+      "deploy-failure"
+    ],
+    "components": [
+      {
+        "name": "Platform"
+      },
+      {
+        "name": "On-Call"
+      }
+    ],
+    "customfield_affected_services": [
+      "notification-service",
+      "kubelet",
+      "api-gateway",
+      "order-service",
+      "payment-service"
+    ]
+  }
+}

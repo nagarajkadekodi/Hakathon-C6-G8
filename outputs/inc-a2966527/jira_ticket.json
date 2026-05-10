@@ -1,0 +1,42 @@
+{
+  "fields": {
+    "project": {
+      "key": "OPS"
+    },
+    "summary": "[P1] inc-a2966527 \u2014 5 issues on redis-cache, payment-service-7d9f84c9b6-rx2pm, deployment-controller",
+    "description": "h2. Incident Summary\nProduction is experiencing multiple P1 failures: `payment-service` is returning `DB_CONN_TIMEOUT`, `PAYMENT_INIT_FAILED`, `OutOfMemoryError: Java heap space`, and `OOMKilled`/`CrashLoopBackOff` events, while `api-gateway` is returning 504s on `POST /api/v1/payments` and 401s on `GET /api/v1/profile` due to `auth-service` token validation timeouts from Redis. Affected services are `payment-service`, `api-gateway`, `postgres-primary`, `auth-service`, `redis-cache`, and the rollout for `payment-service` `v2.8.4` is degraded with only 1 of 6 replicas available. Overall severity is P1 with immediate user impact on payment submission, payment initialization, and authenticated access. The single most critical next step is to rollback or stabilize `payment-service` `v2.8.4` and stop the crash loop/OOM condition while relieving pressure on `postgres-primary`.\n\nh2. Issues Detected\nh3. DB_TIMEOUT \u2014 P1\n*Services:* api-gateway, payment-service, postgres-primary\n*Description:* Payment requests are timing out because the PostgreSQL connection pool is exhausted and database connections cannot be acquired.\n*Severity Justification:* This is impacting the payment path in production, with api-gateway returning 504s and payment-service unable to acquire database connections. The blast radius spans payment-service and postgres-primary, and the repeated timeout/exhaustion signals suggest an active major degradation that can block revenue-related transactions.\n\nh3. OOM_KILL \u2014 P1\n*Services:* payment-service, payment-service-7d9f84c9b6-rx2pm\n*Description:* The payment-service pod is running out of memory, crashing, and being killed by Kubernetes for exceeding its memory limit.\n*Severity Justification:* The payment-service pod in prod is crash-looping due to OOMKilled events and Java heap space errors, which directly reduces service availability. Because this is a critical payment service and the failure is persistent with multiple restarts, it is a major user-impacting degradation.\n\nh3. DB_TIMEOUT \u2014 P1\n*Services:* postgres-primary, payment-service\n*Description:* The PostgreSQL database is also experiencing slow queries and transaction lock waits, contributing to payment-service failures.\n*Severity Justification:* This is impacting the payment path in production, with api-gateway returning 504s and payment-service unable to acquire database connections. The blast radius spans payment-service and postgres-primary, and the repeated timeout/exhaustion signals suggest an active major degradation that can block revenue-related transactions.\n\nh3. AUTH_ERROR \u2014 P1\n*Services:* auth-service, api-gateway, redis-cache\n*Description:* Authentication is failing because Redis session lookups are timing out during token validation.\n*Severity Justification:* Authentication failures in production are causing 401s on token validation and affecting the api-gateway and auth-service path. Since auth is a critical service and the Redis timeout is persisting, this can block a broad set of users from accessing the application.\n\nh3. DEPLOY_FAILURE \u2014 P1\n*Services:* deployment-controller, payment-service\n*Description:* A recent payment-service deployment appears to have introduced elevated error rates and reduced availability.\n*Severity Justification:* The production payment-service deployment shows elevated errors and only 1 of 6 desired replicas available, indicating substantial availability loss. Because the affected service is critical and the issue appears tied to a recent rollout with reduced capacity, this is a significant degradation.\n\nh2. Remediation\nSee attached checklist for ordered fix steps.",
+    "issuetype": {
+      "name": "Incident"
+    },
+    "priority": {
+      "name": "High"
+    },
+    "labels": [
+      "incident",
+      "p1",
+      "auto-generated",
+      "db-timeout",
+      "oom-kill",
+      "db-timeout",
+      "auth-error",
+      "deploy-failure"
+    ],
+    "components": [
+      {
+        "name": "Platform"
+      },
+      {
+        "name": "On-Call"
+      }
+    ],
+    "customfield_affected_services": [
+      "redis-cache",
+      "payment-service-7d9f84c9b6-rx2pm",
+      "deployment-controller",
+      "auth-service",
+      "api-gateway",
+      "postgres-primary",
+      "payment-service"
+    ]
+  }
+}

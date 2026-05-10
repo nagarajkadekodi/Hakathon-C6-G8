@@ -1,0 +1,76 @@
+{
+  "blocks": [
+    {
+      "type": "header",
+      "text": {
+        "type": "plain_text",
+        "text": ":large_green_circle: P3 Incident \u2014 inc-4ebc24a6"
+      }
+    },
+    {
+      "type": "divider"
+    },
+    {
+      "type": "section",
+      "text": {
+        "type": "mrkdwn",
+        "text": "A single api-gateway request to `GET /api/v1/accounts` completed successfully with `status=200` and `latency_ms=84` upstream to `account-service`; there are no error types, retries, 5xxs, or degradation indicators in the log.  \nThe affected services are `api-gateway` and `account-service`, but the evidence shows normal request handling rather than an outage.  \nOverall severity is `P3`, with no measurable user impact or blast radius from the observed event.  \nThe most critical next step is to verify recent `api-gateway` and `account-service` error rates and latency around `2026-05-09T10:00:01.214Z` to confirm this is an isolated false positive."
+      }
+    },
+    {
+      "type": "divider"
+    },
+    {
+      "type": "section",
+      "text": {
+        "type": "mrkdwn",
+        "text": "*Issues Identified:*\n\u2022 *UNKNOWN* on `api-gateway, account-service` \u2014 P3 (confidence: 98%)"
+      }
+    },
+    {
+      "type": "section",
+      "fields": [
+        {
+          "type": "mrkdwn",
+          "text": "*Overall Severity:*\nP3"
+        },
+        {
+          "type": "mrkdwn",
+          "text": "*Issues Found:*\n1"
+        }
+      ]
+    },
+    {
+      "type": "actions",
+      "elements": [
+        {
+          "type": "button",
+          "text": {
+            "type": "plain_text",
+            "text": "View Runbook"
+          },
+          "style": "primary",
+          "value": "view_runbook"
+        },
+        {
+          "type": "button",
+          "text": {
+            "type": "plain_text",
+            "text": "Acknowledge"
+          },
+          "value": "acknowledge"
+        },
+        {
+          "type": "button",
+          "text": {
+            "type": "plain_text",
+            "text": "Escalate"
+          },
+          "style": "danger",
+          "value": "escalate"
+        }
+      ]
+    }
+  ],
+  "text": "P3 Incident: inc-4ebc24a6"
+}

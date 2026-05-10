@@ -1,0 +1,247 @@
+{
+  "incident_id": "inc-522be591",
+  "classifications": [
+    {
+      "issue_type": "OOM_KILL",
+      "description": "The payment-service container repeatedly exceeds its 512Mi memory limit, causing OOMKill terminations and entering a CrashLoopBackOff cycle.",
+      "affected_services": [
+        "payment-service",
+        "kubelet"
+      ],
+      "evidence_lines": [
+        "2026-05-09T07:46:23Z ERROR payment-service     OOMKilled: container exceeded memory limit of 512Mi",
+        "2026-05-09T07:46:41Z ERROR payment-service     Pod payment-service-7d9f8b-xk2p9 terminated: OOMKilled (restart #3)",
+        "2026-05-09T07:46:35Z WARN  kubelet             CrashLoopBackOff: back-off 30s restarting failed container"
+      ],
+      "confidence": 0.99
+    },
+    {
+      "issue_type": "DB_TIMEOUT",
+      "description": "The order-service PostgreSQL connection pool is fully exhausted, causing repeated connection acquisition timeouts and cascading order creation failures.",
+      "affected_services": [
+        "order-service",
+        "api-gateway"
+      ],
+      "evidence_lines": [
+        "2026-05-09T07:47:12Z ERROR order-service       PostgreSQL connection pool exhausted (max=20, active=20, waiting=47)",
+        "2026-05-09T07:47:12Z ERROR order-service       Failed to acquire DB connection from pool: timeout after 5000ms",
+        "2026-05-09T07:47:22Z WARN  api-gateway         Upstream order-service returning 500: opening circuit breaker"
+      ],
+      "confidence": 0.98
+    },
+    {
+      "issue_type": "DEPLOY_FAILURE",
+      "description": "The notification-service deployment is failing because the container image registry.prod.internal/notification-service:v1.2.3 cannot be found, leaving the pod stuck in a Pending/ImagePullBackOff state.",
+      "affected_services": [
+        "notification-service",
+        "kubelet"
+      ],
+      "evidence_lines": [
+        "2026-05-09T07:48:05Z ERROR notification-service ErrImagePull: rpc error: code=Unknown desc=failed to pull and unpack image: not found",
+        "2026-05-09T07:48:50Z ERROR notification-service ImagePullBackOff: max retries exceeded, pod stuck in Pending",
+        "2026-05-09T07:48:35Z WARN  kubelet             Back-off pulling image \"registry.prod.internal/notification-service:v1.2.3\""
+      ],
+      "confidence": 0.97
+    }
+  ],
+  "severity": {
+    "per_issue": [
+      {
+        "issue_type": "OOM_KILL",
+        "severity": "P0",
+        "justification": "The payment-service is a revenue-critical service in production and is currently in a CrashLoopBackOff cycle with at least 3 restarts, meaning payment processing is effectively unavailable. This constitutes a full outage of the payment pathway, directly blocking revenue. Persistent OOMKill restarts with no sign of recovery escalate this to P0 requiring immediate intervention."
+      },
+      {
+        "issue_type": "DB_TIMEOUT",
+        "severity": "P0",
+        "justification": "The order-service PostgreSQL connection pool is fully exhausted (20/20 active, 47 queued) and the api-gateway has already opened its circuit breaker, meaning order creation is failing at scale across the entire stack. This is a cascading failure in a revenue-critical service (orders) that has propagated to the API gateway, indicating broad user impact and blocked revenue flow. The combination of pool exhaustion persistence and upstream circuit-breaking makes this a P0."
+      },
+      {
+        "issue_type": "DEPLOY_FAILURE",
+        "severity": "P2",
+        "justification": "The notification-service is a non-critical ancillary service (lower blast radius than payment/order), and an ImagePullBackOff primarily means a new deployment cannot roll out rather than causing an active user-facing outage \u2014 the prior version may still be running. However, because this is in the prod registry namespace, it warrants prompt attention to avoid service degradation if the existing pods are also cycling. Classified P2 as a partial degradation with no immediate revenue impact."
+      }
+    ],
+    "overall_severity": "P0",
+    "overall_justification": "Two concurrent P0 incidents \u2014 payment-service OOMKill CrashLoopBackOff and order-service DB pool exhaustion with circuit-breaker activation \u2014 are simultaneously blocking revenue-critical payment and order flows in production, requiring immediate escalation."
+  },
+  "remediation": [
+    {
+      "issue_type": "OOM_KILL",
+      "steps": [
+        {
+          "step_number": 1,
+          "action": "Immediately increase the payment-service container memory limit from 512Mi to 1024Mi by patching the Deployment: `kubectl set resources deployment/payment-service -c payment-service --limits=memory=1024Mi --requests=memory=768Mi -n <namespace>`. This unblocks the CrashLoopBackOff and restores payment processing while root cause is investigated.",
+          "estimated_time_min": 5,
+          "owner_role": "On-call engineer",
+          "runbook_slug": "k8s-memory-limit-patch"
+        },
+        {
+          "step_number": 2,
+          "action": "Verify pod payment-service-7d9f8b-xk2p9 (and any new replacement pods) recover from CrashLoopBackOff and reach Running state: `kubectl get pods -l app=payment-service -n <namespace> -w`. Confirm restart count stabilizes at 0 for new pod.",
+          "estimated_time_min": 3,
+          "owner_role": "On-call engineer",
+          "runbook_slug": "k8s-pod-recovery-verify"
+        },
+        {
+          "step_number": 3,
+          "action": "Validate payment processing is functional end-to-end by checking the payment-service health endpoint and confirming successful transactions are flowing through (check APM/payment transaction success rate dashboard). Alert the incident channel once payments are confirmed live.",
+          "estimated_time_min": 5,
+          "owner_role": "On-call engineer",
+          "runbook_slug": "payment-service-health-check"
+        },
+        {
+          "step_number": 4,
+          "action": "Capture current memory usage telemetry on the recovered payment-service pod: `kubectl top pod -l app=payment-service -n <namespace>` and pull container memory metrics from Prometheus/Datadog for the window 07:40\u201307:50Z on 2026-05-09. Determine if 1024Mi is sufficient or if further tuning is required.",
+          "estimated_time_min": 10,
+          "owner_role": "On-call engineer",
+          "runbook_slug": "k8s-memory-usage-audit"
+        },
+        {
+          "step_number": 5,
+          "action": "Pull heap/memory profiles from the payment-service at current load: enable pprof endpoint or retrieve existing APM memory profiling data to identify whether the OOM is caused by a memory leak, unexpected payload size, or insufficient baseline allocation. Focus on allocations that spiked at ~07:46Z.",
+          "estimated_time_min": 20,
+          "owner_role": "Service owner",
+          "runbook_slug": "payment-service-memory-profile"
+        },
+        {
+          "step_number": 6,
+          "action": "Review the payment-service changelog and recent deployments prior to 07:46Z on 2026-05-09. Check if a recent code or config change introduced a memory regression (e.g., unbounded caching, large in-memory transaction buffers, missing pagination on DB result sets).",
+          "estimated_time_min": 15,
+          "owner_role": "Service owner",
+          "runbook_slug": "payment-service-deploy-regression"
+        },
+        {
+          "step_number": 7,
+          "action": "Update the payment-service Kubernetes Deployment manifest in the GitOps repository (Helm values or Kustomize overlay) to permanently set memory limit to the validated safe value (at minimum 1024Mi, or higher if profiling indicates). Add a HorizontalPodAutoscaler memory utilization target at 75% to prevent recurrence under load spikes.",
+          "estimated_time_min": 15,
+          "owner_role": "Platform team",
+          "runbook_slug": "k8s-resource-quota-update"
+        },
+        {
+          "step_number": 8,
+          "action": "Set up or validate a Prometheus alerting rule firing at payment-service container memory usage >80% of limit (currently 512Mi, updated to 1024Mi) with a 5-minute window so OOM risk is caught before the next kill event. Verify alert routes to the on-call payment team PagerDuty policy.",
+          "estimated_time_min": 10,
+          "owner_role": "Platform team",
+          "runbook_slug": "k8s-oom-alert-tuning"
+        }
+      ]
+    },
+    {
+      "issue_type": "DB_TIMEOUT",
+      "steps": [
+        {
+          "step_number": 1,
+          "action": "Immediately increase the order-service PostgreSQL connection pool size by patching the runtime configuration (environment variable or config map, e.g. `DB_POOL_MAX=50`) and rolling the order-service deployment: `kubectl set env deployment/order-service DB_POOL_MAX=50 -n <namespace>`. This directly addresses the exhausted pool (max=20, active=20, waiting=47) and unblocks queued connection acquisition.",
+          "estimated_time_min": 5,
+          "owner_role": "On-call engineer",
+          "runbook_slug": "pg-pool-size-increase"
+        },
+        {
+          "step_number": 2,
+          "action": "Verify the PostgreSQL server's `max_connections` setting can accommodate the increased pool: `psql -h <pg-host> -U <admin> -c 'SHOW max_connections;'` and cross-check current active connections: `SELECT count(*) FROM pg_stat_activity WHERE datname='orders';`. Ensure server-side capacity is not the bottleneck before confirming the pool increase.",
+          "estimated_time_min": 5,
+          "owner_role": "On-call engineer",
+          "runbook_slug": "pg-max-connections-check"
+        },
+        {
+          "step_number": 3,
+          "action": "Manually reset the api-gateway circuit breaker for the order-service upstream if it does not auto-recover after order-service stabilizes. Locate the circuit breaker admin endpoint or config (based on evidence at 07:47:22Z) and force it to half-open/closed state: e.g., `curl -X POST http://api-gateway:8080/admin/circuit-breaker/order-service/reset`.",
+          "estimated_time_min": 5,
+          "owner_role": "On-call engineer",
+          "runbook_slug": "api-gateway-circuit-breaker-reset"
+        },
+        {
+          "step_number": 4,
+          "action": "Monitor order-service connection pool metrics and error rate in real time: watch for `active` count dropping below `max`, `waiting` queue draining to 0, and HTTP 500 rate from order-service falling to baseline. Confirm in APM that order creation is succeeding before declaring mitigation complete.",
+          "estimated_time_min": 5,
+          "owner_role": "On-call engineer",
+          "runbook_slug": "order-service-recovery-verify"
+        },
+        {
+          "step_number": 5,
+          "action": "Identify what caused the sudden pool exhaustion at 07:47:12Z. Query PostgreSQL for long-running or idle-in-transaction connections: `SELECT pid, now() - pg_stat_activity.query_start AS duration, query, state FROM pg_stat_activity WHERE state != 'idle' AND datname='orders' ORDER BY duration DESC;`. Terminate any stale/blocking connections with `SELECT pg_terminate_backend(pid)` as needed.",
+          "estimated_time_min": 10,
+          "owner_role": "On-call engineer",
+          "runbook_slug": "pg-idle-connection-cleanup"
+        },
+        {
+          "step_number": 6,
+          "action": "Correlate the DB pool exhaustion onset at 07:47:12Z with order-service deployment history, traffic spike data, and slow query logs. Run `SELECT query, calls, mean_exec_time, total_exec_time FROM pg_stat_statements ORDER BY total_exec_time DESC LIMIT 20;` to identify any newly introduced slow queries that are holding connections longer than expected.",
+          "estimated_time_min": 15,
+          "owner_role": "Service owner",
+          "runbook_slug": "pg-slow-query-investigation"
+        },
+        {
+          "step_number": 7,
+          "action": "Evaluate deploying PgBouncer as a connection pooler in front of the orders PostgreSQL instance if not already present. With 47 queued connections at pool max=20, the application concurrency model requires a proxy-level pool to multiplex safely. Plan and schedule this as a P0 follow-up architectural fix with the Platform team.",
+          "estimated_time_min": 30,
+          "owner_role": "Platform team",
+          "runbook_slug": "pgbouncer-deploy-orders"
+        },
+        {
+          "step_number": 8,
+          "action": "Update Prometheus/Alertmanager rules to fire a P1 alert when order-service pool `waiting` connections exceed 10 for more than 60 seconds and a P0 alert when `active == max` for more than 30 seconds. Validate these alerts route to the on-call order-service team.",
+          "estimated_time_min": 10,
+          "owner_role": "Platform team",
+          "runbook_slug": "pg-pool-exhaustion-alert"
+        }
+      ]
+    },
+    {
+      "issue_type": "DEPLOY_FAILURE",
+      "steps": [
+        {
+          "step_number": 1,
+          "action": "Confirm whether a previous stable version of notification-service is still running (prior to the failed rollout): `kubectl get pods -l app=notification-service -n <namespace>`. If old pods are Running, the service is partially available and urgency is reduced. Document current pod state before taking action.",
+          "estimated_time_min": 3,
+          "owner_role": "On-call engineer",
+          "runbook_slug": "k8s-pod-state-audit"
+        },
+        {
+          "step_number": 2,
+          "action": "Verify whether the image `registry.prod.internal/notification-service:v1.2.3` exists in the internal registry. Log in and inspect: `crane digest registry.prod.internal/notification-service:v1.2.3` or `docker manifest inspect registry.prod.internal/notification-service:v1.2.3`. Determine if the tag was never pushed, was deleted, or if there is a registry connectivity issue.",
+          "estimated_time_min": 5,
+          "owner_role": "On-call engineer",
+          "runbook_slug": "registry-image-existence-check"
+        },
+        {
+          "step_number": 3,
+          "action": "If `registry.prod.internal/notification-service:v1.2.3` does not exist, immediately roll back the notification-service Deployment to the last known good image tag using: `kubectl rollout undo deployment/notification-service -n <namespace>`. Verify rollback completes: `kubectl rollout status deployment/notification-service -n <namespace>`.",
+          "estimated_time_min": 5,
+          "owner_role": "On-call engineer",
+          "runbook_slug": "k8s-deployment-rollback"
+        },
+        {
+          "step_number": 4,
+          "action": "If the image was simply never pushed (CI/CD pipeline gap), trigger a rebuild and push of `notification-service:v1.2.3` from the correct commit SHA in the CI system (Jenkins/GitHub Actions/Tekton). Validate the push succeeded by re-inspecting the registry manifest after the pipeline completes.",
+          "estimated_time_min": 15,
+          "owner_role": "Service owner",
+          "runbook_slug": "cicd-image-rebuild-push"
+        },
+        {
+          "step_number": 5,
+          "action": "Check kubelet image pull credentials for `registry.prod.internal`: `kubectl get secret -n <namespace> | grep registry` and validate the imagePullSecret attached to the notification-service ServiceAccount has a valid, non-expired token for `registry.prod.internal`. Rotate the secret if expired.",
+          "estimated_time_min": 10,
+          "owner_role": "Platform team",
+          "runbook_slug": "k8s-imagepull-secret-validate"
+        },
+        {
+          "step_number": 6,
+          "action": "Once the correct image is available in `registry.prod.internal`, re-apply the notification-service Deployment manifest (or re-trigger the CD pipeline) targeting `notification-service:v1.2.3`. Monitor pod rollout until all pods reach Running state and ImagePullBackOff is cleared: `kubectl rollout status deployment/notification-service -n <namespace>`.",
+          "estimated_time_min": 10,
+          "owner_role": "Service owner",
+          "runbook_slug": "k8s-deployment-redeploy"
+        },
+        {
+          "step_number": 7,
+          "action": "Add an image existence gate to the notification-service CI/CD pipeline: before updating the Kubernetes Deployment manifest, the pipeline must verify that the target image tag exists in `registry.prod.internal` using a pre-deploy validation step (e.g., `crane digest` check or registry API call). Block the deploy and fail the pipeline if the image is absent.",
+          "estimated_time_min": 20,
+          "owner_role": "Platform team",
+          "runbook_slug": "cicd-image-preflight-gate"
+        }
+      ]
+    }
+  ],
+  "summary": "Two concurrent P0 incidents are actively blocking revenue: **payment-service** is in a CrashLoopBackOff cycle after 3+ OOMKill terminations against its 512Mi memory limit, and **order-service** has a fully exhausted PostgreSQL connection pool (20/20 active, 47 queued) that has cascaded to the **api-gateway** opening its circuit breaker and returning HTTP 500s to end users. A separate P2 affecting **notification-service** involves an ImagePullBackOff on image `registry.prod.internal/notification-service:v1.2.3`, leaving that deployment stuck in Pending with no rollout possible. Combined, payment processing and order creation are effectively unavailable in production, constituting a full revenue-path outage. **Immediate next step**: patch the payment-service memory limit to 1024Mi via `kubectl set resources deployment/payment-service --limits=memory=1024Mi` to break the CrashLoopBackOff, then in parallel increase the order-service `DB_POOL_MAX` to 50 and reset the api-gateway circuit breaker."
+}

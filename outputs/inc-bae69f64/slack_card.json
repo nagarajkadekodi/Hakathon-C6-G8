@@ -1,0 +1,76 @@
+{
+  "blocks": [
+    {
+      "type": "header",
+      "text": {
+        "type": "plain_text",
+        "text": ":rotating_light: P0 Incident \u2014 inc-bae69f64"
+      }
+    },
+    {
+      "type": "divider"
+    },
+    {
+      "type": "section",
+      "text": {
+        "type": "mrkdwn",
+        "text": "**Incident inc-bae69f64 (Overall P0):** Three concurrent failures are affecting payment, order, and notification services. `payment-service` is in a CrashLoopBackOff due to repeated OOMKilled terminations after exceeding its 512Mi memory limit (3+ restarts since 07:46:23Z), effectively taking the revenue-critical payment path offline with potential in-flight transaction data loss risk. `order-service` has a fully exhausted PostgreSQL connection pool (20/20 active, 47 waiting), causing cascading 500s through `api-gateway` with its circuit breaker now open, blocking order creation broadly; concurrently, `notification-service` is stuck in ImagePullBackOff because image `registry.prod.internal/notification-service:v1.2.3` does not exist in the registry (P2, non-revenue path). **Immediate next step:** Patch the `payment-service` memory limit to 1024Mi now via `kubectl set resources deployment/payment-service -c payment-service --limits=memory=1024Mi --requests=memory=768Mi` to break the CrashLoopBackOff, then open the P0 escalation bridge per runbook `p0-escalation-notification`."
+      }
+    },
+    {
+      "type": "divider"
+    },
+    {
+      "type": "section",
+      "text": {
+        "type": "mrkdwn",
+        "text": "*Issues Identified:*\n\u2022 *OOM_KILL* on `payment-service, kubelet` \u2014 P0 (confidence: 99%)\n\u2022 *DB_TIMEOUT* on `order-service, api-gateway` \u2014 P1 (confidence: 98%)\n\u2022 *DEPLOY_FAILURE* on `notification-service, kubelet` \u2014 P2 (confidence: 97%)"
+      }
+    },
+    {
+      "type": "section",
+      "fields": [
+        {
+          "type": "mrkdwn",
+          "text": "*Overall Severity:*\nP0"
+        },
+        {
+          "type": "mrkdwn",
+          "text": "*Issues Found:*\n3"
+        }
+      ]
+    },
+    {
+      "type": "actions",
+      "elements": [
+        {
+          "type": "button",
+          "text": {
+            "type": "plain_text",
+            "text": "View Runbook"
+          },
+          "style": "primary",
+          "value": "view_runbook"
+        },
+        {
+          "type": "button",
+          "text": {
+            "type": "plain_text",
+            "text": "Acknowledge"
+          },
+          "value": "acknowledge"
+        },
+        {
+          "type": "button",
+          "text": {
+            "type": "plain_text",
+            "text": "Escalate"
+          },
+          "style": "danger",
+          "value": "escalate"
+        }
+      ]
+    }
+  ],
+  "text": "P0 Incident: inc-bae69f64"
+}

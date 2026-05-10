@@ -1,0 +1,313 @@
+{
+  "incident_id": "inc-e35ef128",
+  "classifications": [
+    {
+      "issue_type": "DB_TIMEOUT",
+      "description": "Payment service requests are failing due to PostgreSQL connection pool exhaustion and database connection timeouts.",
+      "affected_services": [
+        "payment-service",
+        "postgres-primary",
+        "api-gateway"
+      ],
+      "evidence_lines": [
+        "2026-05-09T10:01:13.002Z ERROR [payment-service] trace_id=a81d11 order_id=ORD-78219 error_code=DB_CONN_TIMEOUT message=\"Database connection timed out while creating payment transaction\"",
+        "2026-05-09T10:01:13.225Z WARN  [postgres-primary] db=payments active_connections=195 max_connections=200 wait_event=ClientRead message=\"connection pool near exhaustion\"",
+        "2026-05-09T10:01:14.119Z ERROR [payment-service] trace_id=a81d11 exception=org.postgresql.util.PSQLException message=\"FATAL: remaining connection slots are reserved for non-replication superuser connections\""
+      ],
+      "confidence": 0.99
+    },
+    {
+      "issue_type": "OOM_KILL",
+      "description": "The payment-service pod is experiencing memory exhaustion and is being killed and restarted by Kubernetes.",
+      "affected_services": [
+        "payment-service",
+        "kubelet",
+        "kubernetes"
+      ],
+      "evidence_lines": [
+        "2026-05-09T10:01:20.774Z WARN  [kubelet] namespace=prod pod=payment-service-7d9f84c9b6-rx2pm container=payment-service restart_count=3 reason=CrashLoopBackOff message=\"Back-off restarting failed container\"",
+        "2026-05-09T10:01:22.553Z ERROR [payment-service] pod=payment-service-7d9f84c9b6-rx2pm exception=java.lang.OutOfMemoryError message=\"Java heap space\"",
+        "2026-05-09T10:01:23.018Z WARN  [kubernetes] namespace=prod pod=payment-service-7d9f84c9b6-rx2pm event=OOMKilled message=\"Container killed due to memory limit exceeded\""
+      ],
+      "confidence": 0.99
+    },
+    {
+      "issue_type": "NETWORK_ERROR",
+      "description": "Upstream payment-service requests are timing out and returning gateway errors through the api-gateway.",
+      "affected_services": [
+        "api-gateway",
+        "payment-service"
+      ],
+      "evidence_lines": [
+        "2026-05-09T10:01:12.443Z WARN  [api-gateway] trace_id=a81d11 method=POST path=/api/v1/payments status=504 latency_ms=12030 upstream=payment-service message=\"upstream request timeout\"",
+        "2026-05-09T10:02:01.329Z ERROR [api-gateway] trace_id=b12c44 method=POST path=/api/v1/payments status=502 latency_ms=8321 upstream=payment-service message=\"bad gateway from upstream\"",
+        "2026-05-09T10:02:20.901Z ERROR [api-gateway] trace_id=e19bc1 method=POST path=/api/v1/payments status=504 latency_ms=15012 upstream=payment-service message=\"request timeout after retry attempt\""
+      ],
+      "confidence": 0.9
+    },
+    {
+      "issue_type": "AUTH_ERROR",
+      "description": "Authentication is failing because token validation depends on a slow or timing-out Redis session lookup.",
+      "affected_services": [
+        "auth-service",
+        "redis-cache",
+        "api-gateway"
+      ],
+      "evidence_lines": [
+        "2026-05-09T10:02:04.116Z WARN  [redis-cache] instance=redis-prod-01 command=GET key=session:98281 latency_ms=2740 message=\"Redis command latency exceeded threshold\"",
+        "2026-05-09T10:02:05.719Z ERROR [auth-service] trace_id=c91f12 user_id=20311 event=TOKEN_VALIDATION_FAILED reason=\"Redis session lookup timeout\" status=401",
+        "2026-05-09T10:02:06.432Z WARN  [api-gateway] trace_id=c91f12 method=GET path=/api/v1/profile status=401 latency_ms=3102 upstream=auth-service message=\"authentication failed due to token validation timeout\""
+      ],
+      "confidence": 0.96
+    },
+    {
+      "issue_type": "DEPLOY_FAILURE",
+      "description": "The recent payment-service deployment appears to have triggered increased errors and reduced availability.",
+      "affected_services": [
+        "deployment-controller",
+        "payment-service",
+        "kubernetes"
+      ],
+      "evidence_lines": [
+        "2026-05-09T10:03:01.108Z INFO  [deployment-controller] namespace=prod deployment=payment-service version=v2.8.4 previous_version=v2.8.3 message=\"recent deployment detected within last 30 minutes\"",
+        "2026-05-09T10:03:04.333Z WARN  [deployment-controller] deployment=payment-service version=v2.8.4 change_id=CHG-9182 message=\"error rate increased after deployment\"",
+        "2026-05-09T10:04:08.551Z WARN  [kubernetes] namespace=prod deployment=payment-service available_replicas=1 desired_replicas=6 message=\"deployment availability below threshold\""
+      ],
+      "confidence": 0.84
+    }
+  ],
+  "severity": {
+    "per_issue": [
+      {
+        "issue_type": "DB_TIMEOUT",
+        "severity": "P1",
+        "justification": "This is in production and affects the critical payment path, with PostgreSQL connection pool exhaustion causing repeated transaction failures. The blast radius includes payment-service, postgres-primary, and api-gateway, and the errors are persistent across multiple log lines, indicating major user-facing degradation and revenue impact."
+      },
+      {
+        "issue_type": "OOM_KILL",
+        "severity": "P1",
+        "justification": "The payment-service in prod is crash-looping due to Java heap OOM and Kubernetes OOMKilled events, which means the service is not staying healthy. Because this is a critical revenue service and the failure is persistent with restart_count increasing, it creates major availability impact and SLA risk."
+      },
+      {
+        "issue_type": "NETWORK_ERROR",
+        "severity": "P1",
+        "justification": "The api-gateway is repeatedly returning 502/504s on payment requests because the upstream payment-service is timing out. Since this impacts a critical payment flow in production and occurs across multiple attempts, it represents major user impact with a broad blast radius through the gateway."
+      },
+      {
+        "issue_type": "AUTH_ERROR",
+        "severity": "P1",
+        "justification": "Production authentication is failing due to Redis session lookup timeouts, and the issue is directly blocking user access with 401s through the api-gateway. Auth is a critical service, and the repeated latency/timeouts suggest significant user impact and SLA risk rather than a minor degradation."
+      },
+      {
+        "issue_type": "DEPLOY_FAILURE",
+        "severity": "P1",
+        "justification": "The prod payment-service deployment reduced available replicas far below desired and immediately increased error rates, so the rollout is causing real availability loss. Because it affects a critical service and appears to be actively degrading production traffic, it is a major incident."
+      }
+    ],
+    "overall_severity": "P1",
+    "overall_justification": "The worst issue is the production payment-service failure pattern, especially the OOM kill/crash loop combined with DB timeouts and gateway timeouts, which is blocking critical payment operations. This indicates major customer and revenue impact across multiple dependent services, but not a complete full-site outage."
+  },
+  "remediation": [
+    {
+      "issue_type": "DB_TIMEOUT",
+      "steps": [
+        {
+          "step_number": 1,
+          "action": "Immediately reduce load on `postgres-primary` by pausing or throttling `payment-service` payment transaction traffic via `api-gateway` for `POST /api/v1/payments`, since logs show `active_connections=195 max_connections=200` and `remaining connection slots are reserved` errors.",
+          "estimated_time_min": 10,
+          "owner_role": "On-call engineer",
+          "runbook_slug": "postgres-connection-exhaustion-mitigation"
+        },
+        {
+          "step_number": 2,
+          "action": "Scale out `payment-service` only after confirming it is not creating excessive database sessions; check for stuck connection usage in the payment transaction path that is producing `DB_CONN_TIMEOUT` on trace `a81d11`.",
+          "estimated_time_min": 15,
+          "owner_role": "Service owner",
+          "runbook_slug": "payment-service-db-client-tuning"
+        },
+        {
+          "step_number": 3,
+          "action": "Increase PostgreSQL capacity on `postgres-primary` by raising `max_connections` only if the instance memory headroom allows it, and validate that reserved superuser slots are preserved; current evidence shows the primary is already at 195/200 active connections.",
+          "estimated_time_min": 20,
+          "owner_role": "Database administrator",
+          "runbook_slug": "postgres-max-connections-tuning"
+        },
+        {
+          "step_number": 4,
+          "action": "Inspect `payment-service` database client pool settings for the production payment path and reduce pool size or add connection reuse so it stops saturating `postgres-primary`; align the app pool below the current `max_connections=200` minus admin reserve.",
+          "estimated_time_min": 30,
+          "owner_role": "Service owner",
+          "runbook_slug": "jdbc-pool-tuning"
+        },
+        {
+          "step_number": 5,
+          "action": "Investigate which code path on `payment-service` is leaking or holding connections during transaction creation for `order_id=ORD-78219`, and confirm whether long-running queries or retries are holding connections until timeout.",
+          "estimated_time_min": 45,
+          "owner_role": "Platform team",
+          "runbook_slug": "postgres-slow-query-investigation"
+        }
+      ]
+    },
+    {
+      "issue_type": "OOM_KILL",
+      "steps": [
+        {
+          "step_number": 1,
+          "action": "Immediately roll back or pause the current `payment-service-7d9f84c9b6-rx2pm` rollout in `namespace=prod` because the pod is in `CrashLoopBackOff`, has `restart_count=3`, and is being `OOMKilled`.",
+          "estimated_time_min": 10,
+          "owner_role": "On-call engineer",
+          "runbook_slug": "k8s-rollout-pause"
+        },
+        {
+          "step_number": 2,
+          "action": "Temporarily raise the `payment-service` container memory limit/request in the prod deployment to stop the `Java heap space` failures while keeping it within node capacity, then restart the pod `payment-service-7d9f84c9b6-rx2pm`.",
+          "estimated_time_min": 15,
+          "owner_role": "Platform team",
+          "runbook_slug": "k8s-memory-limit-adjustment"
+        },
+        {
+          "step_number": 3,
+          "action": "Check JVM heap configuration for `payment-service` and lower heap usage or set a safer `-Xmx` below the Kubernetes memory limit so the pod does not exceed the cgroup limit again.",
+          "estimated_time_min": 25,
+          "owner_role": "Service owner",
+          "runbook_slug": "jvm-heap-sizing"
+        },
+        {
+          "step_number": 4,
+          "action": "Review recent memory growth in `payment-service` around the `java.lang.OutOfMemoryError` to identify cache growth, large payload handling, or leak behavior before re-enabling full traffic.",
+          "estimated_time_min": 40,
+          "owner_role": "Service owner",
+          "runbook_slug": "java-memory-leak-investigation"
+        },
+        {
+          "step_number": 5,
+          "action": "After the pod is stable, restore normal replica count and confirm the `prod` deployment no longer reports `OOMKilled` events for `payment-service-7d9f84c9b6-rx2pm`.",
+          "estimated_time_min": 20,
+          "owner_role": "Platform team",
+          "runbook_slug": "k8s-oom-recovery"
+        }
+      ]
+    },
+    {
+      "issue_type": "NETWORK_ERROR",
+      "steps": [
+        {
+          "step_number": 1,
+          "action": "Reduce or temporarily shed `POST /api/v1/payments` traffic at `api-gateway` to prevent repeated `504` and `502` responses while `payment-service` is timing out at `latency_ms=12030`, `8321`, and `15012`.",
+          "estimated_time_min": 10,
+          "owner_role": "On-call engineer",
+          "runbook_slug": "gateway-circuit-breaker"
+        },
+        {
+          "step_number": 2,
+          "action": "Check `payment-service` health and response latency from the gateway path, because the gateway evidence shows `upstream=payment-service` timeout and bad gateway failures rather than a gateway-only issue.",
+          "estimated_time_min": 15,
+          "owner_role": "On-call engineer",
+          "runbook_slug": "upstream-health-check"
+        },
+        {
+          "step_number": 3,
+          "action": "Increase `api-gateway` upstream timeout and retry policy only enough to avoid false failures while the downstream is recovering; the current `request timeout after retry attempt` indicates retry behavior is already exhausting the request budget.",
+          "estimated_time_min": 20,
+          "owner_role": "Platform team",
+          "runbook_slug": "gateway-timeout-tuning"
+        },
+        {
+          "step_number": 4,
+          "action": "Correlate `payment-service` timeout spikes with the concurrent DB and OOM incidents to confirm whether the upstream 504/502s are a symptom of service saturation rather than a network path failure.",
+          "estimated_time_min": 30,
+          "owner_role": "Service owner",
+          "runbook_slug": "cross-service-latency-correlation"
+        },
+        {
+          "step_number": 5,
+          "action": "Restore normal gateway routing only after `payment-service` returns stable 2xx latency and no further `upstream request timeout` errors appear on `trace_id=a81d11`, `b12c44`, and `e19bc1`.",
+          "estimated_time_min": 15,
+          "owner_role": "Platform team",
+          "runbook_slug": "gateway-traffic-restoration"
+        }
+      ]
+    },
+    {
+      "issue_type": "AUTH_ERROR",
+      "steps": [
+        {
+          "step_number": 1,
+          "action": "Mitigate the `redis-cache` latency spike on `instance=redis-prod-01` by checking current load and pausing nonessential session reads, since `GET key=session:98281 latency_ms=2740` is causing auth timeouts.",
+          "estimated_time_min": 10,
+          "owner_role": "On-call engineer",
+          "runbook_slug": "redis-latency-mitigation"
+        },
+        {
+          "step_number": 2,
+          "action": "Verify `auth-service` token validation failure path for `trace_id=c91f12` and confirm the Redis session lookup timeout is the direct cause of the `401` responses through `api-gateway`.",
+          "estimated_time_min": 15,
+          "owner_role": "Service owner",
+          "runbook_slug": "auth-token-validation-debug"
+        },
+        {
+          "step_number": 3,
+          "action": "Scale or fail over `redis-cache` for `redis-prod-01` if it is resource constrained, then re-test session lookup latency to bring `GET` latency below the timeout threshold.",
+          "estimated_time_min": 20,
+          "owner_role": "Platform team",
+          "runbook_slug": "redis-scale-or-failover"
+        },
+        {
+          "step_number": 4,
+          "action": "Tune `auth-service` to use a short bounded timeout and graceful fallback for Redis session reads so token validation does not block the `/api/v1/profile` path when Redis is slow.",
+          "estimated_time_min": 25,
+          "owner_role": "Service owner",
+          "runbook_slug": "auth-service-redis-timeout-tuning"
+        },
+        {
+          "step_number": 5,
+          "action": "Investigate why `redis-prod-01` command latency is elevated and check for hot keys, CPU saturation, or network contention affecting session lookup performance.",
+          "estimated_time_min": 35,
+          "owner_role": "Platform team",
+          "runbook_slug": "redis-performance-investigation"
+        }
+      ]
+    },
+    {
+      "issue_type": "DEPLOY_FAILURE",
+      "steps": [
+        {
+          "step_number": 1,
+          "action": "Freeze further rollout of `payment-service` version `v2.8.4` in `namespace=prod` because the deployment is already down to `available_replicas=1` of `desired_replicas=6` and error rate increased after change `CHG-9182`.",
+          "estimated_time_min": 5,
+          "owner_role": "Deployment controller",
+          "runbook_slug": "deployment-freeze"
+        },
+        {
+          "step_number": 2,
+          "action": "Rollback `payment-service` from `v2.8.4` to `previous_version=v2.8.3` to restore availability while the incident is active; the deployment controller already flagged the recent deployment as the likely trigger.",
+          "estimated_time_min": 15,
+          "owner_role": "Service owner",
+          "runbook_slug": "k8s-deployment-rollback"
+        },
+        {
+          "step_number": 3,
+          "action": "Verify Kubernetes replica health after rollback and wait for `available_replicas` to return toward the `desired_replicas=6` target before re-enabling traffic.",
+          "estimated_time_min": 15,
+          "owner_role": "Platform team",
+          "runbook_slug": "k8s-replica-recovery"
+        },
+        {
+          "step_number": 4,
+          "action": "Compare `v2.8.4` against `v2.8.3` for changes that could explain the increased errors, especially the payment transaction and memory paths that coincide with the OOM and DB timeout evidence.",
+          "estimated_time_min": 40,
+          "owner_role": "Service owner",
+          "runbook_slug": "release-diff-investigation"
+        },
+        {
+          "step_number": 5,
+          "action": "Re-deploy `payment-service` only after fixing the identified regression and validating a canary against production traffic thresholds; do not advance beyond one replica until error rates normalize.",
+          "estimated_time_min": 45,
+          "owner_role": "Deployment controller",
+          "runbook_slug": "canary-release-validation"
+        }
+      ]
+    }
+  ],
+  "summary": "Production `payment-service` is failing on multiple fronts: PostgreSQL connection pool exhaustion is causing `DB_CONN_TIMEOUT` and `PSQLException: FATAL: remaining connection slots are reserved`, the pod is crash-looping with `java.lang.OutOfMemoryError: Java heap space` and `OOMKilled`, and `api-gateway` is returning repeated `502`/`504` timeouts for `POST /api/v1/payments`. Affected services include `payment-service`, `postgres-primary`, `api-gateway`, `kubelet`/`kubernetes`, and `deployment-controller`; `auth-service` and `redis-cache` also have a separate P1 auth timeout issue causing `401`s. Overall severity is P1 with major user impact: payment requests are failing, the payment deployment is down to `1/6` available replicas, and authentication is intermittently blocking profile access. The single most critical next step is to immediately pause or roll back the `payment-service` rollout and shed `POST /api/v1/payments` traffic to stop the cascading DB, OOM, and gateway failures."
+}

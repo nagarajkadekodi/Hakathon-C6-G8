@@ -1,0 +1,76 @@
+{
+  "blocks": [
+    {
+      "type": "header",
+      "text": {
+        "type": "plain_text",
+        "text": ":red_circle: P1 Incident \u2014 inc-a26a8228"
+      }
+    },
+    {
+      "type": "divider"
+    },
+    {
+      "type": "section",
+      "text": {
+        "type": "mrkdwn",
+        "text": "Production is experiencing a P1 incident centered on `payment-service`: `DB_CONN_TIMEOUT` errors, PostgreSQL pool exhaustion on `postgres-primary` (`active_connections=195 max_connections=200` and `FATAL: remaining connection slots are reserved for non-replication superuser connections`), `java.lang.OutOfMemoryError: Java heap space`, and `CrashLoopBackOff/OOMKilled` restarts on pod `payment-service-7d9f84c9b6-rx2pm`.  \nThe impact extends to `postgres-primary`, `api-gateway`, `auth-service`, `redis-cache`, `kubelet`, `kubernetes`, and `deployment-controller`; `api-gateway` is returning 401s from auth timeouts, and `payment-service` availability is down to `1/6` replicas after the `v2.8.4` deployment.  \nOverall severity is P1 with immediate user impact on payment transaction creation and authenticated API access, causing intermittent unavailability and elevated 401/timeout failures in production.  \nThe single most critical next step is to roll back `payment-service` from `v2.8.4` to `v2.8.3` immediately to stop the deployment from amplifying DB pressure and crash loops."
+      }
+    },
+    {
+      "type": "divider"
+    },
+    {
+      "type": "section",
+      "text": {
+        "type": "mrkdwn",
+        "text": "*Issues Identified:*\n\u2022 *DB_TIMEOUT* on `payment-service, postgres-primary, api-gateway` \u2014 P1 (confidence: 99%)\n\u2022 *OOM_KILL* on `payment-service, kubelet, kubernetes` \u2014 P1 (confidence: 99%)\n\u2022 *DB_TIMEOUT* on `postgres-primary, payment-service` \u2014 P1 (confidence: 90%)\n\u2022 *AUTH_ERROR* on `auth-service, redis-cache, api-gateway` \u2014 P1 (confidence: 97%)\n\u2022 *DEPLOY_FAILURE* on `payment-service, deployment-controller, kubernetes` \u2014 P1 (confidence: 84%)"
+      }
+    },
+    {
+      "type": "section",
+      "fields": [
+        {
+          "type": "mrkdwn",
+          "text": "*Overall Severity:*\nP1"
+        },
+        {
+          "type": "mrkdwn",
+          "text": "*Issues Found:*\n5"
+        }
+      ]
+    },
+    {
+      "type": "actions",
+      "elements": [
+        {
+          "type": "button",
+          "text": {
+            "type": "plain_text",
+            "text": "View Runbook"
+          },
+          "style": "primary",
+          "value": "view_runbook"
+        },
+        {
+          "type": "button",
+          "text": {
+            "type": "plain_text",
+            "text": "Acknowledge"
+          },
+          "value": "acknowledge"
+        },
+        {
+          "type": "button",
+          "text": {
+            "type": "plain_text",
+            "text": "Escalate"
+          },
+          "style": "danger",
+          "value": "escalate"
+        }
+      ]
+    }
+  ],
+  "text": "P1 Incident: inc-a26a8228"
+}

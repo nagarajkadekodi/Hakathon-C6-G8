@@ -1,0 +1,76 @@
+{
+  "blocks": [
+    {
+      "type": "header",
+      "text": {
+        "type": "plain_text",
+        "text": ":red_circle: P1 Incident \u2014 inc-39613be6"
+      }
+    },
+    {
+      "type": "divider"
+    },
+    {
+      "type": "section",
+      "text": {
+        "type": "mrkdwn",
+        "text": "payment-service is repeatedly OOMKilled after exceeding its 512Mi memory limit, and order-service is hitting PostgreSQL connection pool exhaustion with max=20, active=20, and 47 waiting requests; notification-service also failed to start with ErrImagePull: image not found, and auth-service logged JWT validation failures due to signature mismatch. Affected services are payment-service, order-service, notification-service, and auth-service. Overall severity is P1 because payment and order are critical customer flows, and users are seeing transaction degradation, delayed or failing order operations, plus partial auth and notification impact. The single most critical next step is to immediately scale out payment-service and raise or relieve its memory pressure to stop the repeated OOM kills."
+      }
+    },
+    {
+      "type": "divider"
+    },
+    {
+      "type": "section",
+      "text": {
+        "type": "mrkdwn",
+        "text": "*Issues Identified:*\n\u2022 *OOM_KILL* on `payment-service` \u2014 P1 (confidence: 99%)\n\u2022 *DB_TIMEOUT* on `order-service` \u2014 P1 (confidence: 95%)\n\u2022 *DEPLOY_FAILURE* on `notification-service` \u2014 P2 (confidence: 98%)\n\u2022 *AUTH_ERROR* on `auth-service` \u2014 P2 (confidence: 97%)"
+      }
+    },
+    {
+      "type": "section",
+      "fields": [
+        {
+          "type": "mrkdwn",
+          "text": "*Overall Severity:*\nP1"
+        },
+        {
+          "type": "mrkdwn",
+          "text": "*Issues Found:*\n4"
+        }
+      ]
+    },
+    {
+      "type": "actions",
+      "elements": [
+        {
+          "type": "button",
+          "text": {
+            "type": "plain_text",
+            "text": "View Runbook"
+          },
+          "style": "primary",
+          "value": "view_runbook"
+        },
+        {
+          "type": "button",
+          "text": {
+            "type": "plain_text",
+            "text": "Acknowledge"
+          },
+          "value": "acknowledge"
+        },
+        {
+          "type": "button",
+          "text": {
+            "type": "plain_text",
+            "text": "Escalate"
+          },
+          "style": "danger",
+          "value": "escalate"
+        }
+      ]
+    }
+  ],
+  "text": "P1 Incident: inc-39613be6"
+}

@@ -1,0 +1,217 @@
+{
+  "incident_id": "inc-39613be6",
+  "classifications": [
+    {
+      "issue_type": "OOM_KILL",
+      "description": "payment-service was killed for exceeding its memory limit and experienced repeated OOM kills.",
+      "affected_services": [
+        "payment-service"
+      ],
+      "evidence_lines": [
+        "2026-05-09T07:46:23Z ERROR payment-service OOMKilled: container exceeded memory limit of 512Mi",
+        "2026-05-09T07:49:01Z ERROR payment-service repeated OOMKill #2 within 3 minutes"
+      ],
+      "confidence": 0.99
+    },
+    {
+      "issue_type": "DB_TIMEOUT",
+      "description": "order-service is experiencing database access failure due to an exhausted PostgreSQL connection pool.",
+      "affected_services": [
+        "order-service"
+      ],
+      "evidence_lines": [
+        "2026-05-09T07:47:12Z ERROR order-service PostgreSQL connection pool exhausted (max=20, active=20, waiting=47)"
+      ],
+      "confidence": 0.95
+    },
+    {
+      "issue_type": "DEPLOY_FAILURE",
+      "description": "notification-service failed to start because the container image could not be pulled.",
+      "affected_services": [
+        "notification-service"
+      ],
+      "evidence_lines": [
+        "2026-05-09T07:48:05Z ERROR notification-service ErrImagePull: failed to pull and unpack image: not found"
+      ],
+      "confidence": 0.98
+    },
+    {
+      "issue_type": "AUTH_ERROR",
+      "description": "auth-service rejected a JWT during validation because the signature did not match.",
+      "affected_services": [
+        "auth-service"
+      ],
+      "evidence_lines": [
+        "2026-05-09T07:48:30Z WARN auth-service JWT token validation failed: signature mismatch"
+      ],
+      "confidence": 0.97
+    }
+  ],
+  "severity": {
+    "per_issue": [
+      {
+        "issue_type": "OOM_KILL",
+        "severity": "P1",
+        "justification": "This is in payment-service, which is a critical revenue-path system, and repeated OOM kills indicate persistent instability rather than a one-off crash. Even though the blast radius is currently one service, payment processing degradation can block transactions and put SLA at risk."
+      },
+      {
+        "issue_type": "DB_TIMEOUT",
+        "severity": "P1",
+        "justification": "Order-service is critical and the exhausted PostgreSQL pool shows active waiting requests, meaning user operations are being delayed or failing. The persistence of the pool saturation and the likely impact on order creation makes this a major degradation with significant user impact."
+      },
+      {
+        "issue_type": "DEPLOY_FAILURE",
+        "severity": "P2",
+        "justification": "Notification-service is lower criticality than payment, auth, or order, and the failure appears limited to one service failing to start due to an image pull issue. This is a partial degradation with a clear workaround in deployment/rollback or fixing the image reference."
+      },
+      {
+        "issue_type": "AUTH_ERROR",
+        "severity": "P2",
+        "justification": "Auth-service is a critical system, but the evidence shows a single JWT validation warning rather than widespread repeated failures or an outage. This looks like a subset-of-requests failure or edge-case rejection, so it is degraded but not enough evidence for a major incident."
+      }
+    ],
+    "overall_severity": "P1",
+    "overall_justification": "The worst issue is the repeated OOM kills in payment-service and the order-service database pool exhaustion, both of which affect critical customer flows. Together they indicate major production degradation with significant user impact and SLA risk."
+  },
+  "remediation": [
+    {
+      "issue_type": "OOM_KILL",
+      "steps": [
+        {
+          "step_number": 1,
+          "action": "Scale out the payment-service deployment immediately to reduce per-pod memory pressure while the current pod is being killed for exceeding its 512Mi limit; if horizontal scaling is already in place, temporarily add one replica to absorb traffic.",
+          "estimated_time_min": 10,
+          "owner_role": "On-call engineer",
+          "runbook_slug": "payment-service-scale-out"
+        },
+        {
+          "step_number": 2,
+          "action": "Temporarily raise the payment-service memory limit above 512Mi in the live workload spec if cluster capacity allows, and restart the affected pod to stop the repeated OOMKill pattern (#2 within 3 minutes).",
+          "estimated_time_min": 15,
+          "owner_role": "On-call engineer",
+          "runbook_slug": "k8s-memory-limit-adjustment"
+        },
+        {
+          "step_number": 3,
+          "action": "Check the payment-service container logs and recent request patterns for memory growth leading up to 2026-05-09T07:46:23Z and 07:49:01Z to identify whether a specific code path, batch job, or payload size is causing the leak or spike.",
+          "estimated_time_min": 25,
+          "owner_role": "Service owner",
+          "runbook_slug": "payment-service-memory-investigation"
+        },
+        {
+          "step_number": 4,
+          "action": "If the memory spike correlates with a recent release, roll back payment-service to the last known good version and verify the pod no longer exceeds the 512Mi limit under production traffic.",
+          "estimated_time_min": 20,
+          "owner_role": "Service owner",
+          "runbook_slug": "payment-service-rollback"
+        },
+        {
+          "step_number": 5,
+          "action": "After stabilization, capture a memory profile of payment-service and add a permanent request/limit right-sizing or leak fix so the container does not repeatedly OOMKill under normal revenue-path load.",
+          "estimated_time_min": 45,
+          "owner_role": "Platform team",
+          "runbook_slug": "payment-service-rightsizing"
+        },
+        {
+          "step_number": 1,
+          "action": "Reduce immediate pressure on the PostgreSQL pool by scaling out order-service replicas or temporarily throttling order-service concurrency, because the pool is exhausted at max=20 with 20 active and 47 waiting requests.",
+          "estimated_time_min": 10,
+          "owner_role": "On-call engineer",
+          "runbook_slug": "order-service-load-shedding"
+        },
+        {
+          "step_number": 2,
+          "action": "Validate the PostgreSQL-side connection limits and current active sessions for order-service, then close any leaked or idle-in-transaction sessions consuming the pool before more requests queue behind the 47 waiting threads.",
+          "estimated_time_min": 20,
+          "owner_role": "Database administrator",
+          "runbook_slug": "postgres-connection-reclaim"
+        },
+        {
+          "step_number": 3,
+          "action": "Increase the order-service database pool size only if PostgreSQL capacity and query latency permit it; align the pool to observed demand while keeping it below the database max-connection headroom to avoid amplifying contention.",
+          "estimated_time_min": 15,
+          "owner_role": "Platform team",
+          "runbook_slug": "pg-pool-tuning"
+        },
+        {
+          "step_number": 4,
+          "action": "Inspect order-service code paths for connection leaks or long-held transactions that would explain active=20 and waiting=47, and trace the slowest queries during the failure window around 2026-05-09T07:47:12Z.",
+          "estimated_time_min": 30,
+          "owner_role": "Service owner",
+          "runbook_slug": "order-service-connection-leak"
+        },
+        {
+          "step_number": 5,
+          "action": "If a recent deployment introduced the pool exhaustion, roll back order-service to the previous stable build and verify the PostgreSQL pool returns to normal utilization under live traffic.",
+          "estimated_time_min": 20,
+          "owner_role": "Service owner",
+          "runbook_slug": "order-service-rollback"
+        },
+        {
+          "step_number": 1,
+          "action": "Fix the notification-service image reference used by the failed rollout: ErrImagePull shows 'failed to pull and unpack image: not found', so confirm the exact image tag/digest exists in the registry and update the deployment manifest accordingly.",
+          "estimated_time_min": 15,
+          "owner_role": "Service owner",
+          "runbook_slug": "fix-image-reference"
+        },
+        {
+          "step_number": 2,
+          "action": "Redeploy notification-service after correcting the image path or tag, and watch the pod events to confirm the container starts instead of returning ErrImagePull.",
+          "estimated_time_min": 10,
+          "owner_role": "On-call engineer",
+          "runbook_slug": "notification-service-redeploy"
+        },
+        {
+          "step_number": 3,
+          "action": "If the intended image was deleted or never published, restore the missing notification-service artifact in the registry from the CI pipeline or promote the last known good image used by the service.",
+          "estimated_time_min": 25,
+          "owner_role": "Release engineering",
+          "runbook_slug": "registry-image-restore"
+        },
+        {
+          "step_number": 4,
+          "action": "Audit the notification-service deployment pipeline to ensure the image tag is pinned and published before rollout so the 'not found' pull failure cannot recur on the next deployment.",
+          "estimated_time_min": 30,
+          "owner_role": "Platform team",
+          "runbook_slug": "image-publish-validation"
+        },
+        {
+          "step_number": 1,
+          "action": "Verify the JWT signing key or public key bundle used by auth-service against the issuer currently signing tokens, because validation failed with 'signature mismatch' at 2026-05-09T07:48:30Z.",
+          "estimated_time_min": 15,
+          "owner_role": "Service owner",
+          "runbook_slug": "jwt-signing-key-check"
+        },
+        {
+          "step_number": 2,
+          "action": "Check for a recent auth-service key rotation or issuer configuration change and restore the correct key/version if tokens are being signed with a different secret or certificate than auth-service expects.",
+          "estimated_time_min": 20,
+          "owner_role": "Platform team",
+          "runbook_slug": "auth-key-rotation-rollback"
+        },
+        {
+          "step_number": 3,
+          "action": "Validate a sample token end-to-end with auth-service and the issuing system to confirm the mismatch is resolved, then monitor for continued JWT validation failures across production requests.",
+          "estimated_time_min": 15,
+          "owner_role": "On-call engineer",
+          "runbook_slug": "jwt-validation-confirmation"
+        },
+        {
+          "step_number": 4,
+          "action": "If the mismatch is caused by stale config, restart auth-service after updating its key/config map so all instances load the same signing material and no subset continues rejecting valid JWTs.",
+          "estimated_time_min": 10,
+          "owner_role": "On-call engineer",
+          "runbook_slug": "auth-service-config-reload"
+        },
+        {
+          "step_number": 5,
+          "action": "Review token issuance and rotation automation to prevent future signature mismatches, including overlap windows for old and new keys and explicit deployment ordering between issuer and auth-service.",
+          "estimated_time_min": 30,
+          "owner_role": "Service owner",
+          "runbook_slug": "jwt-rotation-hardening"
+        }
+      ]
+    }
+  ],
+  "summary": "payment-service is repeatedly OOMKilled after exceeding its 512Mi memory limit, and order-service is hitting PostgreSQL connection pool exhaustion with max=20, active=20, and 47 waiting requests; notification-service also failed to start with ErrImagePull: image not found, and auth-service logged JWT validation failures due to signature mismatch. Affected services are payment-service, order-service, notification-service, and auth-service. Overall severity is P1 because payment and order are critical customer flows, and users are seeing transaction degradation, delayed or failing order operations, plus partial auth and notification impact. The single most critical next step is to immediately scale out payment-service and raise or relieve its memory pressure to stop the repeated OOM kills."
+}

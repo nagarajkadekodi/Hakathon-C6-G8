@@ -1,0 +1,43 @@
+{
+  "fields": {
+    "project": {
+      "key": "OPS"
+    },
+    "summary": "[P1] inc-bde77b9d \u2014 5 issues on auth-service, redis-cache, kubelet",
+    "description": "h2. Incident Summary\nPayment-service is failing due to PostgreSQL connection pool exhaustion and DB timeouts (`DB_CONN_TIMEOUT`, `FATAL: remaining connection slots are reserved...`), and the same pod is also crashing with `java.lang.OutOfMemoryError: Java heap space` and `OOMKilled`/`CrashLoopBackOff`. The blast radius includes `payment-service`, `postgres-primary`, `api-gateway`, `kubelet`/`kubernetes`, plus secondary auth degradation in `auth-service` and `redis-cache` from Redis session lookup timeouts causing 401s. Overall severity is P1 with immediate user impact on payment submissions and some authenticated requests failing or timing out, including 502/504s from `api-gateway` on `/api/v1/payments`. The single most critical next step is to roll back `payment-service` from `v2.8.4` to `v2.8.3` and immediately relieve pressure on `postgres-primary` while restoring pod memory headroom.\n\nh2. Issues Detected\nh3. DB_TIMEOUT \u2014 P1\n*Services:* payment-service, postgres-primary, api-gateway\n*Description:* Payment service requests are failing due to PostgreSQL connection timeouts and pool exhaustion.\n*Severity Justification:* This is in prod and affects the payment path, which is revenue-critical. The log shows direct payment transaction failures plus PostgreSQL pool exhaustion and reserved connection-slot errors, indicating an active, persistent degradation with broad impact on payment-service and the API gateway.\n\nh3. OOM_KILL \u2014 P1\n*Services:* payment-service, kubelet, kubernetes\n*Description:* The payment-service pod is crashing due to out-of-memory conditions and being killed by Kubernetes.\n*Severity Justification:* The payment-service pod is repeatedly crashing in prod due to OOMKilled/Java heap space, which directly impacts a critical revenue service. CrashLoopBackOff with multiple restarts shows persistence, and the blast radius extends to Kubernetes availability for that service.\n\nh3. NETWORK_ERROR \u2014 P1\n*Services:* api-gateway, payment-service\n*Description:* Upstream payment-service requests are timing out and returning gateway errors from the API gateway.\n*Severity Justification:* API gateway requests to the payment-service are timing out and returning 502/504s, so end-user payment calls are failing. Because this is a critical payment flow in prod and the errors repeat across multiple timestamps, the impact is major rather than isolated.\n\nh3. AUTH_ERROR \u2014 P1\n*Services:* auth-service, redis-cache, api-gateway\n*Description:* Token validation is failing because Redis session lookup is timing out, causing authentication failures.\n*Severity Justification:* Auth is a critical service, and the Redis session lookup timeouts are causing token validation failures and 401s for user requests. The issue affects login/session validation through the API gateway in prod, creating significant user-facing access degradation.\n\nh3. DEPLOY_FAILURE \u2014 P2\n*Services:* deployment-controller, payment-service, kubernetes\n*Description:* A recent payment-service deployment appears to have triggered an increased error rate and reduced availability.\n*Severity Justification:* The deployment has reduced payment-service availability in prod, but it has not fully taken the service down. Since only a subset of replicas are unavailable and the issue appears tied to a recent rollout, this is partial degradation with a likely rollback/workaround path.\n\nh2. Remediation\nSee attached checklist for ordered fix steps.",
+    "issuetype": {
+      "name": "Incident"
+    },
+    "priority": {
+      "name": "High"
+    },
+    "labels": [
+      "incident",
+      "p1",
+      "auto-generated",
+      "db-timeout",
+      "oom-kill",
+      "network-error",
+      "auth-error",
+      "deploy-failure"
+    ],
+    "components": [
+      {
+        "name": "Platform"
+      },
+      {
+        "name": "On-Call"
+      }
+    ],
+    "customfield_affected_services": [
+      "auth-service",
+      "redis-cache",
+      "kubelet",
+      "api-gateway",
+      "kubernetes",
+      "postgres-primary",
+      "deployment-controller",
+      "payment-service"
+    ]
+  }
+}

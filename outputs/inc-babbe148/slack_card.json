@@ -1,0 +1,76 @@
+{
+  "blocks": [
+    {
+      "type": "header",
+      "text": {
+        "type": "plain_text",
+        "text": ":red_circle: P1 Incident \u2014 inc-babbe148"
+      }
+    },
+    {
+      "type": "divider"
+    },
+    {
+      "type": "section",
+      "text": {
+        "type": "mrkdwn",
+        "text": "Payment-service is failing payments due to PostgreSQL connection timeouts and pool exhaustion (`DB_CONN_TIMEOUT`, `PSQLException: FATAL: remaining connection slots are reserved`), and it is also crashing with `java.lang.OutOfMemoryError: Java heap space` and `OOMKilled` in CrashLoopBackOff. Postgres-primary is under contention with `active_connections=195/200`, `slow_query_ms=8421`, and `lock_wait_ms=6032`, while auth-service and api-gateway are also returning 401s from Redis session lookup timeouts. Overall severity is P1, with immediate user impact on payment submission and authentication-dependent API access, and the recent payment-service v2.8.4 deployment has only 1/6 replicas available. The single most critical next step is to roll back payment-service from v2.8.4 to v2.8.3 and pause the rollout while relieving postgres-primary connection pressure."
+      }
+    },
+    {
+      "type": "divider"
+    },
+    {
+      "type": "section",
+      "text": {
+        "type": "mrkdwn",
+        "text": "*Issues Identified:*\n\u2022 *DB_TIMEOUT* on `payment-service, postgres-primary, api-gateway` \u2014 P1 (confidence: 99%)\n\u2022 *OOM_KILL* on `payment-service, kubelet, kubernetes` \u2014 P1 (confidence: 99%)\n\u2022 *DB_TIMEOUT* on `postgres-primary, payment-service` \u2014 P1 (confidence: 94%)\n\u2022 *AUTH_ERROR* on `auth-service, redis-cache, api-gateway` \u2014 P1 (confidence: 98%)\n\u2022 *DEPLOY_FAILURE* on `payment-service, deployment-controller, kubernetes` \u2014 P2 (confidence: 82%)"
+      }
+    },
+    {
+      "type": "section",
+      "fields": [
+        {
+          "type": "mrkdwn",
+          "text": "*Overall Severity:*\nP1"
+        },
+        {
+          "type": "mrkdwn",
+          "text": "*Issues Found:*\n5"
+        }
+      ]
+    },
+    {
+      "type": "actions",
+      "elements": [
+        {
+          "type": "button",
+          "text": {
+            "type": "plain_text",
+            "text": "View Runbook"
+          },
+          "style": "primary",
+          "value": "view_runbook"
+        },
+        {
+          "type": "button",
+          "text": {
+            "type": "plain_text",
+            "text": "Acknowledge"
+          },
+          "value": "acknowledge"
+        },
+        {
+          "type": "button",
+          "text": {
+            "type": "plain_text",
+            "text": "Escalate"
+          },
+          "style": "danger",
+          "value": "escalate"
+        }
+      ]
+    }
+  ],
+  "text": "P1 Incident: inc-babbe148"
+}

@@ -1,0 +1,33 @@
+{
+  "fields": {
+    "project": {
+      "key": "OPS"
+    },
+    "summary": "[P3] inc-6e5766e0 \u2014 1 issues on account-service, api-gateway",
+    "description": "h2. Incident Summary\nThe only observed event was a successful `api-gateway` `GET /api/v1/accounts` request returning `200` in `84ms` with no error condition; the incident is classified as `UNKNOWN` and the per-issue/overall severity is `P3`.  \nServices referenced are `api-gateway` and upstream `account-service`, but no degradation, retries, 5xxs, or cascading failures are present in the evidence.  \nUser impact is effectively none: the request completed normally and there is no indication of an active outage or service slowdown.  \nThe single most critical next step is to verify recent `api-gateway` and `account-service` error rates and latency around `2026-05-09T10:00:01.214Z` to confirm this is an isolated false positive and close the incident if metrics remain clean.\n\nh2. Issues Detected\nh3. UNKNOWN \u2014 P3\n*Services:* api-gateway, account-service\n*Description:* The api-gateway successfully handled a GET request to /api/v1/accounts with a 200 response and no error is indicated in the log.\n*Severity Justification:* The log shows a successful 200 response from api-gateway with normal latency and no error condition. There is no evidence of degradation, persistence, or cascading impact on the affected services.\n\nh2. Remediation\nSee attached checklist for ordered fix steps.",
+    "issuetype": {
+      "name": "Incident"
+    },
+    "priority": {
+      "name": "Low"
+    },
+    "labels": [
+      "incident",
+      "p3",
+      "auto-generated",
+      "unknown"
+    ],
+    "components": [
+      {
+        "name": "Platform"
+      },
+      {
+        "name": "On-Call"
+      }
+    ],
+    "customfield_affected_services": [
+      "account-service",
+      "api-gateway"
+    ]
+  }
+}

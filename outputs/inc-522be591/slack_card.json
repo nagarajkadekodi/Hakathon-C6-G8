@@ -1,0 +1,76 @@
+{
+  "blocks": [
+    {
+      "type": "header",
+      "text": {
+        "type": "plain_text",
+        "text": ":rotating_light: P0 Incident \u2014 inc-522be591"
+      }
+    },
+    {
+      "type": "divider"
+    },
+    {
+      "type": "section",
+      "text": {
+        "type": "mrkdwn",
+        "text": "Two concurrent P0 incidents are actively blocking revenue: **payment-service** is in a CrashLoopBackOff cycle after 3+ OOMKill terminations against its 512Mi memory limit, and **order-service** has a fully exhausted PostgreSQL connection pool (20/20 active, 47 queued) that has cascaded to the **api-gateway** opening its circuit breaker and returning HTTP 500s to end users. A separate P2 affecting **notification-service** involves an ImagePullBackOff on image `registry.prod.internal/notification-service:v1.2.3`, leaving that deployment stuck in Pending with no rollout possible. Combined, payment processing and order creation are effectively unavailable in production, constituting a full revenue-path outage. **Immediate next step**: patch the payment-service memory limit to 1024Mi via `kubectl set resources deployment/payment-service --limits=memory=1024Mi` to break the CrashLoopBackOff, then in parallel increase the order-service `DB_POOL_MAX` to 50 and reset the api-gateway circuit breaker."
+      }
+    },
+    {
+      "type": "divider"
+    },
+    {
+      "type": "section",
+      "text": {
+        "type": "mrkdwn",
+        "text": "*Issues Identified:*\n\u2022 *OOM_KILL* on `payment-service, kubelet` \u2014 P0 (confidence: 99%)\n\u2022 *DB_TIMEOUT* on `order-service, api-gateway` \u2014 P0 (confidence: 98%)\n\u2022 *DEPLOY_FAILURE* on `notification-service, kubelet` \u2014 P2 (confidence: 97%)"
+      }
+    },
+    {
+      "type": "section",
+      "fields": [
+        {
+          "type": "mrkdwn",
+          "text": "*Overall Severity:*\nP0"
+        },
+        {
+          "type": "mrkdwn",
+          "text": "*Issues Found:*\n3"
+        }
+      ]
+    },
+    {
+      "type": "actions",
+      "elements": [
+        {
+          "type": "button",
+          "text": {
+            "type": "plain_text",
+            "text": "View Runbook"
+          },
+          "style": "primary",
+          "value": "view_runbook"
+        },
+        {
+          "type": "button",
+          "text": {
+            "type": "plain_text",
+            "text": "Acknowledge"
+          },
+          "value": "acknowledge"
+        },
+        {
+          "type": "button",
+          "text": {
+            "type": "plain_text",
+            "text": "Escalate"
+          },
+          "style": "danger",
+          "value": "escalate"
+        }
+      ]
+    }
+  ],
+  "text": "P0 Incident: inc-522be591"
+}

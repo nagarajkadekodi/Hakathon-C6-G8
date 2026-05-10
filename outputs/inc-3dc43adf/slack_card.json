@@ -1,0 +1,76 @@
+{
+  "blocks": [
+    {
+      "type": "header",
+      "text": {
+        "type": "plain_text",
+        "text": ":red_circle: P1 Incident \u2014 inc-3dc43adf"
+      }
+    },
+    {
+      "type": "divider"
+    },
+    {
+      "type": "section",
+      "text": {
+        "type": "mrkdwn",
+        "text": "payment-service is failing with `DB_CONN_TIMEOUT`, `PSQLException: FATAL: remaining connection slots are reserved for non-replication superuser connections`, and `java.lang.OutOfMemoryError: Java heap space` leading to `OOMKilled`/`CrashLoopBackOff`; PostgreSQL on `postgres-primary` also shows `slow_query_ms=8421` and `lock_wait_ms=6032`, and `auth-service` is returning `TOKEN_VALIDATION_FAILED` from `Redis session lookup timeout` with `api-gateway` 401s. Affected services are `payment-service`, `postgres-primary`, `api-gateway`, `auth-service`, `redis-cache`, and the specific pod `payment-service-7d9f84c9b6-rx2pm`; `payment-service` deployment `v2.8.4` is down to `1/6` available replicas. Overall severity is **P1** with immediate user impact across payment submission and authenticated API requests, causing failed payment attempts and 401s. The single most critical next step is to **relieve pressure on `postgres-primary` by terminating runaway/idle-in-transaction sessions and reducing `payment-service` database traffic**."
+      }
+    },
+    {
+      "type": "divider"
+    },
+    {
+      "type": "section",
+      "text": {
+        "type": "mrkdwn",
+        "text": "*Issues Identified:*\n\u2022 *DB_TIMEOUT* on `payment-service, postgres-primary, api-gateway` \u2014 P1 (confidence: 99%)\n\u2022 *OOM_KILL* on `payment-service, payment-service-7d9f84c9b6-rx2pm` \u2014 P1 (confidence: 99%)\n\u2022 *DB_TIMEOUT* on `postgres-primary, payment-service` \u2014 P1 (confidence: 93%)\n\u2022 *AUTH_ERROR* on `auth-service, redis-cache, api-gateway` \u2014 P1 (confidence: 98%)\n\u2022 *DEPLOY_FAILURE* on `deployment-controller, payment-service` \u2014 P2 (confidence: 83%)"
+      }
+    },
+    {
+      "type": "section",
+      "fields": [
+        {
+          "type": "mrkdwn",
+          "text": "*Overall Severity:*\nP1"
+        },
+        {
+          "type": "mrkdwn",
+          "text": "*Issues Found:*\n5"
+        }
+      ]
+    },
+    {
+      "type": "actions",
+      "elements": [
+        {
+          "type": "button",
+          "text": {
+            "type": "plain_text",
+            "text": "View Runbook"
+          },
+          "style": "primary",
+          "value": "view_runbook"
+        },
+        {
+          "type": "button",
+          "text": {
+            "type": "plain_text",
+            "text": "Acknowledge"
+          },
+          "value": "acknowledge"
+        },
+        {
+          "type": "button",
+          "text": {
+            "type": "plain_text",
+            "text": "Escalate"
+          },
+          "style": "danger",
+          "value": "escalate"
+        }
+      ]
+    }
+  ],
+  "text": "P1 Incident: inc-3dc43adf"
+}
