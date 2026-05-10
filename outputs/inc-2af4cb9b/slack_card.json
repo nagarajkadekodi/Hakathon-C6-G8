@@ -1,0 +1,76 @@
+{
+  "blocks": [
+    {
+      "type": "header",
+      "text": {
+        "type": "plain_text",
+        "text": ":rotating_light: P0 Incident \u2014 inc-2af4cb9b"
+      }
+    },
+    {
+      "type": "divider"
+    },
+    {
+      "type": "section",
+      "text": {
+        "type": "mrkdwn",
+        "text": "Incident inc-2af4cb9b involves three simultaneous failures: payment-service is in CrashLoopBackOff (3+ restarts) after repeatedly exceeding its 512Mi memory limit with OOMKill, order-service PostgreSQL connection pool is fully exhausted (20/20 active, 47 waiting) causing all order creation to fail and triggering a circuit breaker open on api-gateway, and notification-service is stuck in Pending due to ImagePullBackOff for image `registry.prod.internal/notification-service:v1.2.3`. Payment-service and order-service are both rated P0 \u2014 payment processing and order creation are completely down in production, constituting active revenue blockage across two critical services simultaneously; notification-service is P2 with no direct revenue impact. All user-facing payment and order flows are currently unavailable. **Immediate next step:** Scale payment-service to 0 replicas to halt the CrashLoopBackOff cycle (`kubectl scale deployment payment-service --replicas=0`), then emergency-bump its memory limit to 1024Mi and restore replicas \u2014 in parallel, kill blocking PostgreSQL connections on the order-service DB instance and increase the connection pool max from 20 to 40 via `DB_POOL_MAX=40` with a rolling restart."
+      }
+    },
+    {
+      "type": "divider"
+    },
+    {
+      "type": "section",
+      "text": {
+        "type": "mrkdwn",
+        "text": "*Issues Identified:*\n\u2022 *OOM_KILL* on `payment-service, kubelet` \u2014 P0 (confidence: 99%)\n\u2022 *DB_TIMEOUT* on `order-service, api-gateway` \u2014 P0 (confidence: 98%)\n\u2022 *DEPLOY_FAILURE* on `notification-service, kubelet` \u2014 P2 (confidence: 97%)"
+      }
+    },
+    {
+      "type": "section",
+      "fields": [
+        {
+          "type": "mrkdwn",
+          "text": "*Overall Severity:*\nP0"
+        },
+        {
+          "type": "mrkdwn",
+          "text": "*Issues Found:*\n3"
+        }
+      ]
+    },
+    {
+      "type": "actions",
+      "elements": [
+        {
+          "type": "button",
+          "text": {
+            "type": "plain_text",
+            "text": "View Runbook"
+          },
+          "style": "primary",
+          "value": "view_runbook"
+        },
+        {
+          "type": "button",
+          "text": {
+            "type": "plain_text",
+            "text": "Acknowledge"
+          },
+          "value": "acknowledge"
+        },
+        {
+          "type": "button",
+          "text": {
+            "type": "plain_text",
+            "text": "Escalate"
+          },
+          "style": "danger",
+          "value": "escalate"
+        }
+      ]
+    }
+  ],
+  "text": "P0 Incident: inc-2af4cb9b"
+}

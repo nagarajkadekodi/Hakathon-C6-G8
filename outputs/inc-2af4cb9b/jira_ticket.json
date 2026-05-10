@@ -1,0 +1,38 @@
+{
+  "fields": {
+    "project": {
+      "key": "OPS"
+    },
+    "summary": "[P0] inc-2af4cb9b \u2014 3 issues on notification-service, payment-service, kubelet",
+    "description": "h2. Incident Summary\nIncident inc-2af4cb9b involves three simultaneous failures: payment-service is in CrashLoopBackOff (3+ restarts) after repeatedly exceeding its 512Mi memory limit with OOMKill, order-service PostgreSQL connection pool is fully exhausted (20/20 active, 47 waiting) causing all order creation to fail and triggering a circuit breaker open on api-gateway, and notification-service is stuck in Pending due to ImagePullBackOff for image `registry.prod.internal/notification-service:v1.2.3`. Payment-service and order-service are both rated P0 \u2014 payment processing and order creation are completely down in production, constituting active revenue blockage across two critical services simultaneously; notification-service is P2 with no direct revenue impact. All user-facing payment and order flows are currently unavailable. **Immediate next step:** Scale payment-service to 0 replicas to halt the CrashLoopBackOff cycle (`kubectl scale deployment payment-service --replicas=0`), then emergency-bump its memory limit to 1024Mi and restore replicas \u2014 in parallel, kill blocking PostgreSQL connections on the order-service DB instance and increase the connection pool max from 20 to 40 via `DB_POOL_MAX=40` with a rolling restart.\n\nh2. Issues Detected\nh3. OOM_KILL \u2014 P0\n*Services:* payment-service, kubelet\n*Description:* The payment-service container repeatedly exceeded its 512Mi memory limit, triggering OOMKill and entering a CrashLoopBackOff cycle with at least 3 restarts.\n*Severity Justification:* The payment-service is a revenue-critical service in production, and it is stuck in a CrashLoopBackOff cycle with at least 3 restarts, meaning it is functionally unavailable. Any inability to process payments constitutes a direct revenue blockage and warrants immediate escalation as a P0 outage.\n\nh3. DB_TIMEOUT \u2014 P0\n*Services:* order-service, api-gateway\n*Description:* The order-service PostgreSQL connection pool is fully exhausted, causing repeated acquisition timeouts and cascading order creation failures for multiple users.\n*Severity Justification:* The order-service PostgreSQL connection pool is fully exhausted (47 requests waiting against a max of 20), meaning order creation is failing for all users attempting to place orders \u2014 a critical revenue-impacting function. The cascading effect to the api-gateway opening a circuit breaker signals broad blast radius and systemic degradation beyond a single service, confirming full P0 severity.\n\nh3. DEPLOY_FAILURE \u2014 P2\n*Services:* notification-service, kubelet\n*Description:* The notification-service deployment failed because the container image registry.prod.internal/notification-service:v1.2.3 could not be found in the registry, leaving the pod stuck in Pending with ImagePullBackOff.\n*Severity Justification:* The notification-service is a non-revenue-critical, lower-priority service, and its failure to deploy (ImagePullBackOff) means new instances cannot start, but existing functionality and user-facing revenue flows are not directly blocked. The blast radius is contained to notification delivery, and workarounds (e.g., reverting to a valid image tag or using a previously running instance) likely exist, placing this at P2.\n\nh2. Remediation\nSee attached checklist for ordered fix steps.",
+    "issuetype": {
+      "name": "Incident"
+    },
+    "priority": {
+      "name": "Critical"
+    },
+    "labels": [
+      "incident",
+      "p0",
+      "auto-generated",
+      "oom-kill",
+      "db-timeout",
+      "deploy-failure"
+    ],
+    "components": [
+      {
+        "name": "Platform"
+      },
+      {
+        "name": "On-Call"
+      }
+    ],
+    "customfield_affected_services": [
+      "notification-service",
+      "payment-service",
+      "kubelet",
+      "order-service",
+      "api-gateway"
+    ]
+  }
+}
